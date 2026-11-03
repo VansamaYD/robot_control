@@ -29,6 +29,7 @@ from scene_geometry import SCENE
 from projects import code_view
 from errors import MotionError
 import ik_solver
+import detour
 from jog_control import JogMixin
 from presets import HOME_Q, DOCK, DRY_LIMIT_M3, recovery_candidates
 
@@ -521,6 +522,73 @@ class Engine(JogMixin):
             raise MotionError('LIMIT_VIOLATION')
         return result, minimum_gap
 
+    def _plan_dry_detour(self, action, start, liquid, dry_verified):
+        """Only system docking after the dry checkpoint may change path shape."""
+        if (not dry_verified or not action.get('requires_dry') or
+                liquid.ladle > DRY_LIMIT_M3 or sum(p['v'] for p in liquid.packets) > DRY_LIMIT_M3):
+            raise MotionError('DOCK_DRY_INTERLOCK')
+        deadline = time.perf_counter()+6.
+        def guard():
+            self._planning_checkpoint()
+            if time.perf_counter() > deadline:
+                raise MotionError('DETOUR_SEARCH_TIMEOUT', {'budget_s': 6.})
+        def valid(q):
+            guard()
+            if clearance(q)[0] < 0:
+                return False
+            p, n, *_ = arm.fk(q, BASE)
+            return liquid.geometry.connected_volume(p, n, liquid.height) is None
+        def progress(stats):
+            with self.changed:
+                self._planning_checkpoint()
+                self.job['detour_progress'] = stats
+                self.publish()
+        target, normal = np.asarray(action['p']), np.asarray(action['n'])
+        normal = normal/np.linalg.norm(normal)
+        # Exact endpoint still respects the original position and bowl direction.
+        rng = np.random.default_rng(1701)
+        seeds = [start, HOME_Q] + list(rng.uniform(arm.LOW+.02, arm.HIGH-.02, (4, 5)))
+        goals = []
+        for seed in seeds:
+            guard()
+            q, pe, ne, _ = ik_solver.solve(target, normal, BASE, seed, guard=guard, fallback=False)
+            if pe <= .0002 and ne <= .002 and valid(q):
+                if not any(np.linalg.norm(q-g) < .01 for g in goals): goals.append(q)
+        if not goals:
+            raise MotionError('DETOUR_GOAL_UNREACHABLE')
+        last_error = None
+        for goal in sorted(goals, key=lambda q: np.linalg.norm(q-start)):
+            try:
+                points, stats = detour.search(start, goal, arm.LOW+1e-6, arm.HIGH-1e-6,
+                    valid, guard=guard, progress=progress)
+                break
+            except MotionError as error:
+                if str(error) != 'DETOUR_NOT_FOUND': raise
+                last_error = error
+        else:
+            raise last_error
+        result = []
+        q = start.copy()
+        for index, target_q in enumerate(points[1:]):
+            guard()
+            distance = float(np.max(np.abs(target_q-q)))
+            # Quintic interpolation: peak coefficients 1.875 and 5.774.
+            duration = max(1.2, 1.875*distance/np.deg2rad(20),
+                           math.sqrt(5.774*distance/np.deg2rad(40)))
+            item = {'kind': 'move_joints', 'name': '绕行%d：%s' % (index+1, action['name']),
+                    'q_rad': target_q.tolist(), 'duration_s': math.ceil(duration/DT)*DT,
+                    'requires_dry': True}
+            path, gap = self.plan(item, q)
+            result.append((item, path, gap))
+            q = path[-1]
+        with self.changed:
+            self._planning_checkpoint()
+            self.job.setdefault('detours', []).append({**stats, 'action': action['name'],
+                'joint_waypoints': [q.tolist() for q in points], 'validated': False,
+                'duration_s': sum(item['duration_s'] for item, _, _ in result)})
+            self.publish()
+        return result
+
     def _run(self, epoch, program=None):
         try:
             self.planning_context.epoch = epoch
@@ -538,9 +606,12 @@ class Engine(JogMixin):
                         'liquid': initial_liquid.snapshot(), 'configuration': initial_config,
                         'incarnation': initial_incarnation}
                 failures, failure_details = [], []
-                for candidate_index, candidate in enumerate(program['candidates']):
+                # Append search retries only for fixed routes blocked AFTER drainage.
+                attempts = [(i, False, candidate) for i, candidate in enumerate(program['candidates'])]
+                for candidate_index, allow_search, candidate in attempts:
                     try:
-                        paths, q = [], initial_q.copy()
+                        paths, expanded, q = [], [], initial_q.copy()
+                        detour_start = len(self.job.get('detours', []))
                         predicted = deepcopy(initial_liquid)
                         dry_verified = False
                         for segment_index, item in enumerate(candidate):
@@ -548,33 +619,54 @@ class Engine(JogMixin):
                                 if epoch != self.epoch:
                                     return
                                 self.job['planning_progress'] = {'candidate': candidate_index+1, 'segment': segment_index+1,
-                                    'segments': len(candidate), 'name': item['name'], 'elapsed_s': time.perf_counter()-planning_started}
+                                    'segments': len(candidate), 'name': item['name'], 'stage': 'detour' if allow_search else 'fixed',
+                                    'elapsed_s': time.perf_counter()-planning_started}
                                 self.publish()
-                            path, gap = self.plan(item, q)
-                            for sample in path:
-                                self._planning_checkpoint()
-                                p, n, *_ = arm.fk(sample, BASE)
-                                if item.get('requires_dry') and (not dry_verified or predicted.ladle > DRY_LIMIT_M3 or
-                                        predicted.geometry.connected_volume(p, n, predicted.height) is not None):
-                                    raise MotionError('DOCK_DRY_INTERLOCK')
-                                predicted.advance(DT, p, n)
-                                if predicted.spill-initial_liquid.spill > DRY_LIMIT_M3:
-                                    raise MotionError('PREDICTED_SPILL')
-                            if item['kind'] == 'verify_dry':
-                                if predicted.ladle > DRY_LIMIT_M3 or sum(p['v'] for p in predicted.packets) > DRY_LIMIT_M3:
-                                    raise MotionError('DRAIN_INCOMPLETE')
-                                dry_verified = True
-                            q = path[-1]
-                            paths.append((path, gap))
+                            try:
+                                path, gap = self.plan(item, q)
+                                segments = [(item, path, gap)]
+                            except MotionError as error:
+                                if (allow_search and program['preset'] == 'dock' and dry_verified
+                                        and item.get('requires_dry') and item['kind'] == 'move_tcp'
+                                        and str(error) in ('NO_IK', 'COLLISION')):
+                                    segments = self._plan_dry_detour(item, q, predicted, dry_verified)
+                                else:
+                                    raise
+                            for execution_item, path, gap in segments:
+                                for sample in path:
+                                    self._planning_checkpoint()
+                                    p, n, *_ = arm.fk(sample, BASE)
+                                    if execution_item.get('requires_dry') and (not dry_verified or predicted.ladle > DRY_LIMIT_M3 or
+                                            predicted.geometry.connected_volume(p, n, predicted.height) is not None):
+                                        raise MotionError('DOCK_DRY_INTERLOCK')
+                                    predicted.advance(DT, p, n)
+                                    if predicted.spill-initial_liquid.spill > DRY_LIMIT_M3:
+                                        raise MotionError('PREDICTED_SPILL')
+                                if execution_item['kind'] == 'verify_dry':
+                                    if predicted.ladle > DRY_LIMIT_M3 or sum(p['v'] for p in predicted.packets) > DRY_LIMIT_M3:
+                                        raise MotionError('DRAIN_INCOMPLETE')
+                                    dry_verified = True
+                                q = path[-1]
+                                paths.append((path, gap))
+                                expanded.append(execution_item)
                         prepared = paths
-                        program['actions'] = candidate
+                        with self.changed:
+                            self._planning_checkpoint()
+                            for record in self.job.get('detours', [])[detour_start:]:
+                                record['validated'] = True
+                        program['actions'] = expanded
                         break
                     except MotionError as error:
                         if str(error) in ('PLANNING_CANCELLED', 'PLANNING_TIMEOUT'):
                             raise
+                        if (not allow_search and program['preset'] == 'dock' and dry_verified
+                                and item.get('requires_dry') and item['kind'] == 'move_tcp'
+                                and str(error) in ('NO_IK', 'COLLISION')):
+                            attempts.append((candidate_index, True, candidate))
                         failures.append(str(error))
                         failure_details.append({'candidate': candidate_index+1, 'segment': segment_index+1,
-                            'name': item['name'], 'code': str(error), 'details': error.details})
+                            'name': item['name'], 'stage': 'detour' if allow_search else 'fixed',
+                            'code': str(error), 'details': error.details})
                         with self.changed:
                             if epoch != self.epoch:
                                 return

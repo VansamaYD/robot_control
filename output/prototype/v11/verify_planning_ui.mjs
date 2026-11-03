@@ -15,12 +15,21 @@ try {
     const failure = document.getElementById('error').textContent;
     snapshot.job.error = 'PLANNING_TIMEOUT';
     window.__applySnapshot(snapshot);
-    return {failure, timeout:document.getElementById('error').textContent};
+    const timeout = document.getElementById('error').textContent;
+    snapshot.job.error = null;
+    snapshot.job.preplanning = true;
+    snapshot.job.planning_progress = {stage:'detour',candidate:1,segment:2,segments:3,name:'测试绕行',elapsed_s:1};
+    snapshot.job.detour_progress = {nodes:42};
+    window.__applySnapshot(snapshot);
+    return {failure, timeout, progress:document.getElementById('planning-info').textContent};
   });
   assert(text.failure.includes('移动并回正'));
   assert(text.failure.includes('连续关节解'));
   assert(text.failure.includes('未移动'));
   assert(text.timeout.includes('时间预算'));
+  assert(text.progress.includes('绕行预检'));
+  assert(text.progress.includes('搜索节点 42'));
+  console.log('PASS detour stage and search nodes are visible');
   console.log('PASS route failure names the rejected action and reason');
   console.log('PASS planning timeout is distinguished from no route');
 } finally { await browser.close(); }

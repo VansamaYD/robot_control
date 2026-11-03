@@ -58,6 +58,7 @@ def serve(port):
                                        'render_snapshot': True, 'manual_joint_steps': True,
                                        'leased_jog': True, 'recovery_presets': True,
                                        'natural_liquid_exchange': True, 'dock_dry_interlock': True,
+                                       'dry_dock_detour': True, 'detour_scope': 'verified_dry_dock_transfer',
                                        'arbitrary_python': False, 'hardware': False, 'vision': False})
                 if path.path == '/api/projects':
                     return self.reply(store.list())

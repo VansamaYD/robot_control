@@ -248,8 +248,8 @@ try {
     $('readiness').textContent = state.scoop_readiness?.ready ? '取汁几何就绪；进液由液面接触决定。暂停时不演化，可点击“继续仿真”。' : '取汁前检查：' + describeReason(state.scoop_readiness);
     const progress = state.job?.planning_progress;
     $('planning-info').textContent = state.job?.preplanning && progress ?
-      `完整预检：候选 ${progress.candidate}，第 ${progress.segment}/${progress.segments} 段 ${progress.name}（已用≥${progress.elapsed_s.toFixed(1)}s，已拒绝 ${state.job.planning_failures?.length ?? 0} 条）` :
-      state.job?.planning_wall_s !== undefined ? `计算 ${state.job.planning_wall_s.toFixed(2)}s · 动作 ${state.job.planned_duration_s.toFixed(1)}s · ${state.speed}×预览约 ${(state.job.planned_duration_s/state.speed).toFixed(1)}s` : '';
+      `${progress.stage === 'detour' ? '绕行预检' : '完整预检'}：候选 ${progress.candidate}，第 ${progress.segment}/${progress.segments} 段 ${progress.name}（已用≥${progress.elapsed_s.toFixed(1)}s，已拒绝 ${state.job.planning_failures?.length ?? 0} 条${state.job.detour_progress ? `，搜索节点 ${state.job.detour_progress.nodes}` : ''}）` :
+      state.job?.planning_wall_s !== undefined ? `计算 ${state.job.planning_wall_s.toFixed(2)}s · 动作 ${state.job.planned_duration_s.toFixed(1)}s · 已验证绕行 ${state.job.detours?.filter(d => d.validated).length ?? 0} 段 · ${state.speed}×预览约 ${(state.job.planned_duration_s/state.speed).toFixed(1)}s` : '';
     window.__frameState = { ...state, rendered_tcp_m: position.toArray(), tcp_error_m: error,
       maximum_link_matrix_error: Math.max(...linkErrors), visual_mesh_count: visualCount,
       camera: { position: camera.position.toArray(), target: controls.target.toArray(), up: camera.up.toArray(), fov: camera.fov } };
@@ -295,6 +295,8 @@ try {
       const failure = details.failures.at(-1);
       const reason = { NO_IK: '位置或勺口方向未找到连续关节解', COLLISION: '路径可能碰撞',
         LIMIT_VIOLATION: '关节速度、加速度或限位超限', PREDICTED_SPILL: '预测洒漏',
+        DETOUR_NOT_FOUND: '节点预算内未找到绕行路线', DETOUR_SEARCH_TIMEOUT: '绕行搜索达到时间上限',
+        DETOUR_GOAL_UNREACHABLE: '绕行终点未找到可行姿态', DETOUR_ENDPOINT_INVALID: '绕行端点未通过检查',
         DRAIN_INCOMPLETE: '排汁未达近空条件', DOCK_DRY_INTERLOCK: '离锅近空检查未通过' }[failure.code] ?? failure.code;
       return `已检查 ${details.failures.length} 条候选路线，均未通过；未移动。最后失败：${failure.name}，${reason}。可调整姿态后重试或尝试回取汁位。`;
     }
