@@ -1,0 +1,14 @@
+test_all_samples_obey_limits_and_coarse_screen (test_engine.EngineTests.test_all_samples_obey_limits_and_coarse_screen) ... ok
+test_cancel_invalidates_plan_finishing_late (test_engine.EngineTests.test_cancel_invalidates_plan_finishing_late) ... ok
+test_canonical_urdf_and_final_fk_agree (test_engine.EngineTests.test_canonical_urdf_and_final_fk_agree) ... ok
+test_fixed_tick_result_independent_of_observer_frequency (test_engine.EngineTests.test_fixed_tick_result_independent_of_observer_frequency) ... ok
+test_nonfinite_and_zero_normal_rejected (test_engine.EngineTests.test_nonfinite_and_zero_normal_rejected) ... ok
+test_pause_and_single_step_do_not_skip_path_samples (test_engine.EngineTests.test_pause_and_single_step_do_not_skip_path_samples) ... ok
+test_render_frames_do_not_advance_simulation (test_engine.EngineTests.test_render_frames_do_not_advance_simulation) ... ok
+test_screenshot_input_is_immutable_copy (test_engine.EngineTests.test_screenshot_input_is_immutable_copy) ... ok
+test_unreachable_request_does_not_mutate_state (test_engine.EngineTests.test_unreachable_request_does_not_mutate_state) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 2.597s
+
+OK

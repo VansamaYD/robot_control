@@ -1,0 +1,14 @@
+Date: 2026-11-03 (Asia/Shanghai)
+Command: python3 -m unittest discover -s output/design/v10/contracts -p 'test_*.py' -v
+Result: Ran 27 tests; OK; process exit code 0.
+
+Scope: single-threaded executable control semantics reference.
+Covered: paused startup, explicit run, owner exclusion, manual lease expiry,
+autonomous ownership, request fingerprint/idempotency conflicts, rejected-start retry,
+late-command revocation, repeated cancel isolation, principal checks, incarnation,
+sequence and queue bounds, pause and dt stepping, configuration compare-and-swap,
+invalidated context, nonfinite input and snapshot revision publication.
+
+Not covered: full application, physics, motion, collision, liquid, full lifecycle,
+waiting-operator handoff, script isolation, renderer, MCP, persistence, concurrency,
+API schema validation, end-to-end acceptance or performance.

@@ -1,0 +1,488 @@
+{
+  "scope": "trusted-code / URDF / checked motion / WebGL / exact snapshot spike",
+  "tests": [
+    {
+      "name": "official_meshes_and_paused_start",
+      "status": "passed",
+      "details": {
+        "meshes": 15,
+        "tcp_error_m": 1.0372151368152799e-16,
+        "matrix_error": 3.3306690738754696e-16
+      }
+    },
+    {
+      "name": "pause_freezes_authoritative_state",
+      "status": "passed",
+      "details": {
+        "tick": 95
+      }
+    },
+    {
+      "name": "single_tick_advances_exactly_20ms",
+      "status": "passed",
+      "details": {
+        "tick": 96
+      }
+    },
+    {
+      "name": "six_code_actions_complete_with_consistent_frames",
+      "status": "passed",
+      "details": {
+        "tick": 2270,
+        "simulation_time_s": 45.4,
+        "sampled_frames": 50,
+        "code_hash": "b4e3e834cfe775c568eddf36c9c3e044b2b11322d27ff490f39d9110471f8aa5"
+      }
+    },
+    {
+      "name": "idempotency_and_cancel_during_planning",
+      "status": "passed",
+      "details": {
+        "job_id": "run-2",
+        "tick": 2270
+      }
+    },
+    {
+      "name": "headless_exact_historical_snapshot_without_interactive_ui",
+      "status": "passed",
+      "details": {
+        "revision": 1018,
+        "tick": 1006,
+        "image_sha256": "fe45ba4efb4f1dd0b441ae3edf885dffd5304d95a29b53ca10659be6d95f8bb9",
+        "bytes": 152908
+      }
+    },
+    {
+      "name": "autonomous_execution_with_all_browser_pages_closed",
+      "status": "passed",
+      "details": {
+        "before_tick": 2270,
+        "progressed_tick": 2314,
+        "interactive_pages": 0
+      }
+    },
+    {
+      "name": "unknown_snapshot_and_unauthorized_write_rejected",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "name": "malformed_json_shape_and_static_path_escape_rejected",
+      "status": "passed",
+      "details": {}
+    }
+  ],
+  "browserErrors": [],
+  "limitations": [
+    "no untrusted code sandbox",
+    "no liquid transfer",
+    "no MCP",
+    "no mesh collision",
+    "fixed scene"
+  ],
+  "samples": [
+    {
+      "tick": 133,
+      "revision": 141,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.1418304613113945e-16,
+      "matrix_error": 3.885780586188048e-16
+    },
+    {
+      "tick": 172,
+      "revision": 180,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.0737624160317263e-16,
+      "matrix_error": 3.183217578417441e-16
+    },
+    {
+      "tick": 232,
+      "revision": 240,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.1394276305601483e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 272,
+      "revision": 280,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 7.93661956254473e-17,
+      "matrix_error": 3.176712365382528e-16
+    },
+    {
+      "tick": 333,
+      "revision": 341,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.2639455060829638e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 372,
+      "revision": 380,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.0632088068549386e-16,
+      "matrix_error": 4.440892098500626e-16
+    },
+    {
+      "tick": 432,
+      "revision": 440,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.345219838184526e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 472,
+      "revision": 480,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.2639142337802142e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 513,
+      "revision": 521,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.420099532313994e-16,
+      "matrix_error": 5.551115123125783e-16
+    },
+    {
+      "tick": 572,
+      "revision": 580,
+      "action": "提勺",
+      "line": 5,
+      "tcp_error_m": 1.2842435659250295e-16,
+      "matrix_error": 3.133344278483108e-16
+    },
+    {
+      "tick": 610,
+      "revision": 619,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 8.118199065716915e-17,
+      "matrix_error": 3.135512682828079e-16
+    },
+    {
+      "tick": 635,
+      "revision": 645,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.8512119947305075e-16,
+      "matrix_error": 3.131175874138137e-16
+    },
+    {
+      "tick": 674,
+      "revision": 684,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 8.519092375036302e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 755,
+      "revision": 765,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.2000516021084609e-16,
+      "matrix_error": 3.135512682828079e-16
+    },
+    {
+      "tick": 794,
+      "revision": 804,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.0176829365778735e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 834,
+      "revision": 844,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.2191446383739287e-16,
+      "matrix_error": 3.1777965675550135e-16
+    },
+    {
+      "tick": 894,
+      "revision": 904,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.5493912208817607e-16,
+      "matrix_error": 3.135512682828079e-16
+    },
+    {
+      "tick": 934,
+      "revision": 944,
+      "action": "移到鸡背上方",
+      "line": 6,
+      "tcp_error_m": 1.1811069967329378e-16,
+      "matrix_error": 3.1322600763106223e-16
+    },
+    {
+      "tick": 935,
+      "revision": 946,
+      "action": "倾斜汤勺",
+      "line": 7,
+      "tcp_error_m": 1.1811069967329378e-16,
+      "matrix_error": 3.1322600763106223e-16
+    },
+    {
+      "tick": 966,
+      "revision": 978,
+      "action": "倾斜汤勺",
+      "line": 7,
+      "tcp_error_m": 1.1506874200857623e-16,
+      "matrix_error": 3.131175874138137e-16
+    },
+    {
+      "tick": 1006,
+      "revision": 1018,
+      "action": "倾斜汤勺",
+      "line": 7,
+      "tcp_error_m": 1.31941658083934e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1065,
+      "revision": 1077,
+      "action": "倾斜汤勺",
+      "line": 7,
+      "tcp_error_m": 1.3615092990768423e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1105,
+      "revision": 1117,
+      "action": "倾斜汤勺",
+      "line": 7,
+      "tcp_error_m": 1.3964254612015911e-16,
+      "matrix_error": 2.7755575615628914e-16
+    },
+    {
+      "tick": 1135,
+      "revision": 1148,
+      "action": "汤勺回正",
+      "line": 8,
+      "tcp_error_m": 1.1527756336890508e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1150,
+      "revision": 1164,
+      "action": "汤勺回正",
+      "line": 8,
+      "tcp_error_m": 1.3110653970590514e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1210,
+      "revision": 1224,
+      "action": "汤勺回正",
+      "line": 8,
+      "tcp_error_m": 1.0569008315563939e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1250,
+      "revision": 1264,
+      "action": "汤勺回正",
+      "line": 8,
+      "tcp_error_m": 1.2417518519112547e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1311,
+      "revision": 1325,
+      "action": "汤勺回正",
+      "line": 8,
+      "tcp_error_m": 1.1881925892629487e-16,
+      "matrix_error": 3.129007469793166e-16
+    },
+    {
+      "tick": 1335,
+      "revision": 1350,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.1121881410627865e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1350,
+      "revision": 1366,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.1122559036985669e-16,
+      "matrix_error": 3.1344284806555933e-16
+    },
+    {
+      "tick": 1410,
+      "revision": 1426,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.1413535102816523e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1451,
+      "revision": 1467,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.1566946004665399e-16,
+      "matrix_error": 3.183217578417441e-16
+    },
+    {
+      "tick": 1511,
+      "revision": 1527,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.4466480442477598e-16,
+      "matrix_error": 3.133344278483108e-16
+    },
+    {
+      "tick": 1550,
+      "revision": 1566,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 8.404768642679759e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1591,
+      "revision": 1607,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 1.2289108276223323e-16,
+      "matrix_error": 3.1322600763106223e-16
+    },
+    {
+      "tick": 1651,
+      "revision": 1667,
+      "action": "返回取汁上方",
+      "line": 9,
+      "tcp_error_m": 9.008147757778185e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1660,
+      "revision": 1677,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 1.202956885920994e-16,
+      "matrix_error": 3.1344284806555933e-16
+    },
+    {
+      "tick": 1673,
+      "revision": 1691,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 8.74237727769496e-17,
+      "matrix_error": 3.1344284806555933e-16
+    },
+    {
+      "tick": 1732,
+      "revision": 1750,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 8.695301423333746e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1773,
+      "revision": 1791,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 9.019754099775144e-17,
+      "matrix_error": 3.1365968850005643e-16
+    },
+    {
+      "tick": 1813,
+      "revision": 1831,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 7.989039918643667e-17,
+      "matrix_error": 3.135512682828079e-16
+    },
+    {
+      "tick": 1872,
+      "revision": 1890,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 9.691739937440204e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 1913,
+      "revision": 1931,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 1.7301816742326576e-16,
+      "matrix_error": 3.8865356366511863e-16
+    },
+    {
+      "tick": 1973,
+      "revision": 1991,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 8.235870752743013e-17,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 2012,
+      "revision": 2030,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 9.832430090256248e-17,
+      "matrix_error": 3.885780586188048e-16
+    },
+    {
+      "tick": 2053,
+      "revision": 2071,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 9.278000405095529e-17,
+      "matrix_error": 3.885780586188048e-16
+    },
+    {
+      "tick": 2113,
+      "revision": 2131,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 1.4536379788931853e-16,
+      "matrix_error": 4.440892098500626e-16
+    },
+    {
+      "tick": 2153,
+      "revision": 2171,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 1.1837677556422877e-16,
+      "matrix_error": 3.3306690738754696e-16
+    },
+    {
+      "tick": 2213,
+      "revision": 2231,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 1.1394276305601483e-16,
+      "matrix_error": 3.1582809284502744e-16
+    },
+    {
+      "tick": 2253,
+      "revision": 2271,
+      "action": "下降到取汁点",
+      "line": 10,
+      "tcp_error_m": 7.547340438714572e-17,
+      "matrix_error": 3.3306690738754696e-16
+    }
+  ],
+  "browserVersion": "156.0.8078.80",
+  "graphics": "software SwiftShader for repeatable headless validation",
+  "status": "passed"
+}

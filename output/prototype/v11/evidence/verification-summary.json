@@ -1,0 +1,25 @@
+{
+  "status": "spike verification passed",
+  "environment": {
+    "python": "3.13.4",
+    "numpy": "2.3.3",
+    "platform": "macOS-15.7.3-arm64-arm-64bit-Mach-O",
+    "browser": "156.0.8078.80",
+    "graphics": "software SwiftShader for repeatable headless validation"
+  },
+  "engine_tests": 9,
+  "browser_checks": 9,
+  "render_samples": 50,
+  "max_render_tcp_error_m": 1.8512119947305075e-16,
+  "max_render_link_matrix_error": 5.551115123125783e-16,
+  "assets_hash_verified": 19,
+  "so_arm100_commit": "a758567c3978dfeefe282ede0500085a48fe8f78",
+  "scope_exclusions": [
+    "no untrusted code sandbox",
+    "no liquid transfer",
+    "no MCP",
+    "no mesh collision",
+    "fixed scene"
+  ],
+  "product_acceptance": "not completed"
+}
