@@ -83,6 +83,20 @@ class EngineTests(unittest.TestCase):
         np.testing.assert_array_equal(engine.q, self.path[0])
         self.assertTrue(engine.paused)
 
+    def test_empty_scoop_fails_job_without_success_event(self):
+        engine = Engine(realtime=False)
+        engine.liquid.initial = engine.liquid.pot = 0.
+        engine.start('empty-pot')
+        deadline = time.monotonic() + 2
+        while not engine.queue and time.monotonic() < deadline:
+            time.sleep(.005)
+        self.assertTrue(engine.queue)
+        while engine.queue:
+            engine.advance()
+        self.assertEqual(engine.snapshot()['job']['status'], 'failed')
+        self.assertEqual(engine.snapshot()['job']['error'], 'LIQUID_UNAVAILABLE')
+        self.assertFalse(any(event['event'] == 'action_completed' for event in engine.events))
+
     def test_fixed_tick_result_independent_of_observer_frequency(self):
         slow, fast = Engine(realtime=False), Engine(realtime=False)
         for engine in [slow, fast]:

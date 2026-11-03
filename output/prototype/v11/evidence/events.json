@@ -7,91 +7,119 @@
   },
   {
     "seq": 2,
-    "tick": 0,
+    "tick": 2,
     "event": "action_started",
-    "name": "提勺",
-    "line": 5,
+    "name": "舀取 30mL 汤汁",
+    "line": 3,
     "clearance_m": 0.0075184648427114
   },
   {
     "seq": 3,
-    "tick": 610,
+    "tick": 37,
+    "event": "action_completed",
+    "name": "舀取 30mL 汤汁"
+  },
+  {
+    "seq": 4,
+    "tick": 1078,
+    "event": "action_started",
+    "name": "提勺",
+    "line": 4,
+    "clearance_m": 0.0075184648427114
+  },
+  {
+    "seq": 5,
+    "tick": 1688,
     "event": "action_completed",
     "name": "提勺"
   },
   {
-    "seq": 4,
-    "tick": 610,
+    "seq": 6,
+    "tick": 2388,
     "event": "action_started",
     "name": "移到鸡背上方",
-    "line": 6,
+    "line": 5,
     "clearance_m": 0.012499363271357207
   },
   {
-    "seq": 5,
-    "tick": 935,
+    "seq": 7,
+    "tick": 2713,
     "event": "action_completed",
     "name": "移到鸡背上方"
   },
   {
-    "seq": 6,
-    "tick": 935,
+    "seq": 8,
+    "tick": 3261,
     "event": "action_started",
     "name": "倾斜汤勺",
-    "line": 7,
+    "line": 6,
     "clearance_m": 0.012499999994077589
   },
   {
-    "seq": 7,
-    "tick": 1135,
+    "seq": 9,
+    "tick": 3461,
     "event": "action_completed",
     "name": "倾斜汤勺"
   },
   {
-    "seq": 8,
-    "tick": 1135,
+    "seq": 10,
+    "tick": 3463,
+    "event": "action_started",
+    "name": "保持倾角淋汁",
+    "line": 7,
+    "clearance_m": 0.012506914298005413
+  },
+  {
+    "seq": 11,
+    "tick": 3588,
+    "event": "action_completed",
+    "name": "保持倾角淋汁"
+  },
+  {
+    "seq": 12,
+    "tick": 4024,
     "event": "action_started",
     "name": "汤勺回正",
     "line": 8,
     "clearance_m": 0.012500000004753688
   },
   {
-    "seq": 9,
-    "tick": 1335,
+    "seq": 13,
+    "tick": 4224,
     "event": "action_completed",
     "name": "汤勺回正"
   },
   {
-    "seq": 10,
-    "tick": 1335,
+    "seq": 14,
+    "tick": 4957,
     "event": "action_started",
     "name": "返回取汁上方",
     "line": 9,
     "clearance_m": 0.012499382784377518
   },
   {
-    "seq": 11,
-    "tick": 1660,
+    "seq": 15,
+    "tick": 5282,
     "event": "action_completed",
     "name": "返回取汁上方"
   },
   {
-    "seq": 12,
-    "tick": 1660,
+    "seq": 16,
+    "tick": 6619,
     "event": "action_started",
     "name": "下降到取汁点",
     "line": 10,
     "clearance_m": 0.007518459868842146
   },
   {
-    "seq": 13,
-    "tick": 2270,
+    "seq": 17,
+    "tick": 7229,
     "event": "action_completed",
     "name": "下降到取汁点"
   },
   {
-    "seq": 14,
-    "tick": 2270,
+    "seq": 18,
+    "tick": 7229,
     "event": "job_succeeded"
   }
 ]

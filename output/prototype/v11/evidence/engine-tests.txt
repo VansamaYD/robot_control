@@ -1,14 +1,35 @@
 test_all_samples_obey_limits_and_coarse_screen (test_engine.EngineTests.test_all_samples_obey_limits_and_coarse_screen) ... ok
 test_cancel_invalidates_plan_finishing_late (test_engine.EngineTests.test_cancel_invalidates_plan_finishing_late) ... ok
 test_canonical_urdf_and_final_fk_agree (test_engine.EngineTests.test_canonical_urdf_and_final_fk_agree) ... ok
+test_empty_scoop_fails_job_without_success_event (test_engine.EngineTests.test_empty_scoop_fails_job_without_success_event) ... ok
 test_fixed_tick_result_independent_of_observer_frequency (test_engine.EngineTests.test_fixed_tick_result_independent_of_observer_frequency) ... ok
 test_nonfinite_and_zero_normal_rejected (test_engine.EngineTests.test_nonfinite_and_zero_normal_rejected) ... ok
 test_pause_and_single_step_do_not_skip_path_samples (test_engine.EngineTests.test_pause_and_single_step_do_not_skip_path_samples) ... ok
 test_render_frames_do_not_advance_simulation (test_engine.EngineTests.test_render_frames_do_not_advance_simulation) ... ok
 test_screenshot_input_is_immutable_copy (test_engine.EngineTests.test_screenshot_input_is_immutable_copy) ... ok
 test_unreachable_request_does_not_mutate_state (test_engine.EngineTests.test_unreachable_request_does_not_mutate_state) ... ok
+test_above_surface_or_blocked_cannot_scoop (test_liquid_projects.GeometryAndLiquidTests.test_above_surface_or_blocked_cannot_scoop) ... ok
+test_bad_timestep_rejected (test_liquid_projects.GeometryAndLiquidTests.test_bad_timestep_rejected) ... ok
+test_displacement_is_bounded_by_pot (test_liquid_projects.GeometryAndLiquidTests.test_displacement_is_bounded_by_pot) ... ok
+test_empty_pot_cannot_fill_ladle (test_liquid_projects.GeometryAndLiquidTests.test_empty_pot_cannot_fill_ladle) ... ok
+test_many_scoop_pour_cycles_keep_ledger (test_liquid_projects.GeometryAndLiquidTests.test_many_scoop_pour_cycles_keep_ledger) ... ok
+test_pour_hits_chicken_and_returns (test_liquid_projects.GeometryAndLiquidTests.test_pour_hits_chicken_and_returns) ... ok
+test_pour_outside_pot_is_spill (test_liquid_projects.GeometryAndLiquidTests.test_pour_outside_pot_is_spill) ... ok
+test_scoop_changes_level_and_conserves (test_liquid_projects.GeometryAndLiquidTests.test_scoop_changes_level_and_conserves) ... ok
+test_segment_hit_detects_passing_through_chicken (test_liquid_projects.GeometryAndLiquidTests.test_segment_hit_detects_passing_through_chicken) ... ok
+test_tilted_ladle_cannot_scoop (test_liquid_projects.GeometryAndLiquidTests.test_tilted_ladle_cannot_scoop) ... ok
+test_volume_height_inverse_monotonic (test_liquid_projects.GeometryAndLiquidTests.test_volume_height_inverse_monotonic) ... ok
+test_edit_creates_new_version_and_preserves_old (test_liquid_projects.ProjectTests.test_edit_creates_new_version_and_preserves_old) ... ok
+test_empty_or_oversized_recipe_rejected (test_liquid_projects.ProjectTests.test_empty_or_oversized_recipe_rejected) ... ok
+test_excess_scoop_volume_rejected (test_liquid_projects.ProjectTests.test_excess_scoop_volume_rejected) ... ok
+test_imported_code_is_regenerated_not_executed (test_liquid_projects.ProjectTests.test_imported_code_is_regenerated_not_executed) ... ok
+test_nonfinite_or_bool_duration_rejected (test_liquid_projects.ProjectTests.test_nonfinite_or_bool_duration_rejected) ... ok
+test_revision_path_escape_rejected (test_liquid_projects.ProjectTests.test_revision_path_escape_rejected) ... ok
+test_save_reload_and_dedup (test_liquid_projects.ProjectTests.test_save_reload_and_dedup) ... ok
+test_tampered_actions_detected (test_liquid_projects.ProjectTests.test_tampered_actions_detected) ... ok
+test_unknown_actions_and_fields_rejected (test_liquid_projects.ProjectTests.test_unknown_actions_and_fields_rejected) ... ok
 
 ----------------------------------------------------------------------
-Ran 9 tests in 2.597s
+Ran 30 tests in 3.913s
 
 OK

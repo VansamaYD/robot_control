@@ -11,8 +11,10 @@ window.__errors = [];
 
 try {
   const bootstrap = await (await fetch('/api/bootstrap')).json();
-  const source = bootstrap.code.split('\n');
-  source.forEach((line, i) => {
+  let selectedProgram = bootstrap.default_program;
+  function showCode(code) {
+  $('source').replaceChildren();
+  code.split('\n').forEach((line, i) => {
     const row = document.createElement('div');
     row.dataset.line = i + 1;
     const number = document.createElement('span');
@@ -20,7 +22,10 @@ try {
     row.append(number, document.createTextNode(line));
     $('source').append(row);
   });
+  }
+  showCode(selectedProgram.code);
   const model = bootstrap.model;
+  const geometry = bootstrap.scene;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#101a26');
   const container = $('viewport');
@@ -50,18 +55,18 @@ try {
   const grid = new THREE.GridHelper(1.4, 28, 0x345268, 0x233748);
   grid.rotation.x = Math.PI / 2; grid.position.z = -.024; scene.add(grid);
   // Same spherical-cap pot profile as the checked v03 collision approximation.
-  const potRadius = (.2 ** 2 + .12 ** 2) / (2 * .12);
+  const mouth = geometry.pot.radius_m, depth = geometry.pot.depth_m;
+  const potRadius = (mouth ** 2 + depth ** 2) / (2 * depth);
   const potProfile = Array.from({ length: 49 }, (_, i) => {
-    const z = .12 * i / 48;
+    const z = depth * i / 48;
     return new THREE.Vector2(Math.sqrt(Math.max(0, potRadius ** 2 - (potRadius - z) ** 2)), z);
   });
   const pot = mesh(new THREE.LatheGeometry(potProfile, 96), material(0x657d8e, { transparent: true, opacity: .42, side: THREE.DoubleSide }));
   pot.rotation.x = Math.PI / 2;
-  const rim = mesh(new THREE.TorusGeometry(.2, .004, 10, 100), steel); rim.position.z = .12;
-  const juiceRadius = Math.sqrt(potRadius ** 2 - (potRadius - .08) ** 2);
-  const juice = mesh(new THREE.CircleGeometry(juiceRadius, 96), material(0x703a1e, { metalness: .1, roughness: .22 })); juice.position.z = .08;
+  const rim = mesh(new THREE.TorusGeometry(mouth, .004, 10, 100), steel); rim.position.z = depth;
+  const juice = mesh(new THREE.CircleGeometry(1, 96), material(0x703a1e, { metalness: .1, roughness: .22 }));
   const chicken = mesh(new THREE.SphereGeometry(1, 48, 24), material(0xb87635, { roughness: .65 }));
-  chicken.scale.set(.13, .09, .075); chicken.position.set(0, .05, .075);
+  chicken.scale.fromArray(geometry.chicken.radii_m); chicken.position.fromArray(geometry.chicken.center_m);
   for (const sign of [-1, 1]) {
     const leg = mesh(new THREE.SphereGeometry(1, 24, 16), material(0xa96b31));
     leg.scale.set(.035, .055, .035); leg.position.set(sign * .08, .085, .065);
@@ -105,11 +110,17 @@ try {
   }
   rod([0, 0, 0], [0, 0, -.09], .004);
   rod([0, 0, -.09], model.tool_offset_m, .004);
-  const bowlGeometry = new THREE.SphereGeometry(.025, 32, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+  const ladleRadius = geometry.ladle.radius_m;
+  const bowlGeometry = new THREE.SphereGeometry(ladleRadius, 32, 20, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
   bowlGeometry.rotateZ(-Math.PI / 2);
   const bowl = mesh(bowlGeometry, steel, toolRoot); bowl.position.fromArray(model.tool_offset_m);
-  const spoonRim = mesh(new THREE.TorusGeometry(.025, .0015, 8, 48), steel, toolRoot);
+  const spoonRim = mesh(new THREE.TorusGeometry(ladleRadius, .0015, 8, 48), steel, toolRoot);
   spoonRim.rotation.y = Math.PI / 2; spoonRim.position.fromArray(model.tool_offset_m);
+  const ladleLiquid = mesh(new THREE.CircleGeometry(1, 48), material(0xa45c24, { side: THREE.DoubleSide, roughness: .25 }), toolRoot);
+  ladleLiquid.rotation.y = Math.PI / 2;
+  const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(.0025, 8, 8), material(0xe3a854), 128);
+  scene.add(drops); drops.count = 0;
+  const dropMatrix = new THREE.Matrix4();
   const tcp = new THREE.Object3D(); tcp.position.fromArray(model.tool_offset_m); toolRoot.add(tcp);
   const tcpMarker = mesh(new THREE.SphereGeometry(.004, 12, 8), material(0x85ffdc));
   const trace = mesh(new THREE.SphereGeometry(.002, 8, 8), material(0xffffff)); trace.visible = false;
@@ -133,6 +144,31 @@ try {
       return Math.max(...actual.map((value, j) => Math.abs(value - expected[j])));
     });
     tcpMarker.position.copy(position);
+    const liquid = state.liquid;
+    const liquidRadius = Math.sqrt(Math.max(0, potRadius ** 2 - (potRadius - liquid.height_m) ** 2));
+    juice.position.z = liquid.height_m; juice.scale.set(liquidRadius, liquidRadius, 1);
+    let low = 0, high = ladleRadius;
+    for (let i = 0; i < 24; i++) {
+      const d = (low + high) / 2;
+      if (Math.PI * d * d * (ladleRadius - d / 3) < liquid.ladle_m3) low = d; else high = d;
+    }
+    const fillHeight = (low + high) / 2;
+    const fillRadius = Math.sqrt(Math.max(0, 2 * ladleRadius * fillHeight - fillHeight * fillHeight));
+    ladleLiquid.visible = liquid.ladle_m3 > 1e-10;
+    ladleLiquid.position.fromArray(model.tool_offset_m); ladleLiquid.position.x += -ladleRadius + fillHeight;
+    ladleLiquid.scale.set(fillRadius, fillRadius, 1);
+    drops.count = Math.min(128, liquid.packets.length);
+    liquid.packets.slice(0, 128).forEach((packet, index) => {
+      dropMatrix.makeTranslation(...packet.position_m); drops.setMatrixAt(index, dropMatrix);
+    });
+    drops.instanceMatrix.needsUpdate = true;
+    $('liquid-ledger').replaceChildren(...[
+      ['锅内', liquid.pot_m3], ['勺内', liquid.ladle_m3], ['空中 / 表面', liquid.air_m3 + liquid.surface_m3],
+      ['洒漏', liquid.spill_m3], ['收支偏差', liquid.balance_error_m3]
+    ].map(([label, amount]) => {
+      const row = document.createElement('div'), title = document.createElement('span'), value = document.createElement('b');
+      title.textContent = label; value.textContent = (amount * 1e6).toFixed(3) + ' mL'; row.append(title, value); return row;
+    }));
     if (!current || state.tick !== current.tick) {
       history.push(position.clone()); if (history.length > 4000) history.shift();
       trajectory.geometry.dispose(); trajectory.geometry = new THREE.BufferGeometry().setFromPoints(history);
@@ -152,13 +188,14 @@ try {
       }
       return row;
     }));
-    document.querySelectorAll('#source div').forEach(row => row.classList.toggle('active', Number(row.dataset.line) === state.action?.source_line));
+    document.querySelectorAll('#source div').forEach(row => row.classList.toggle('active', state.job?.program_revision === selectedProgram.revision && Number(row.dataset.line) === state.action?.source_line));
     const busy = ['planning', 'running'].includes(state.job?.status);
     $('run').disabled = busy;
     $('pause').disabled = !busy || state.paused;
     $('resume').disabled = !busy || !state.paused;
     $('step').disabled = !busy || !state.paused;
     $('cancel').disabled = !busy;
+    for (const id of ['project', 'edit', 'save', 'import']) $(id).disabled = busy;
     $('error').textContent = state.job?.error ?? '';
     window.__frameState = { ...state, rendered_tcp_m: position.toArray(), tcp_error_m: error,
       maximum_link_matrix_error: Math.max(...linkErrors), visual_mesh_count: visualCount,
@@ -169,6 +206,11 @@ try {
     const response = await fetch('/api/state' + (requestedRevision ? '?revision=' + encodeURIComponent(requestedRevision) : ''));
     const state = await response.json();
     if (!response.ok) throw new Error(state.error);
+    if (['planning', 'running'].includes(state.job?.status) && state.job.program_revision !== selectedProgram.revision) {
+      const programResponse = await fetch('/api/projects/' + state.job.program_revision);
+      if (!programResponse.ok) throw new Error('运行版本不可读取');
+      displayProgram(await programResponse.json());
+    }
     drawState(state);
   }
   async function post(path, data) {
@@ -181,7 +223,51 @@ try {
     try { $('error').textContent = ''; await callback(); await update(); }
     catch (error) { $('error').textContent = error.message; window.__errors.push(error.message); }
   };
-  $('run').onclick = act(() => post('/api/run', { idempotency_key: crypto.randomUUID() }));
+  function displayProgram(program) {
+    selectedProgram = program;
+    showCode(program.code);
+    $('program-revision').textContent = program.revision.slice(0, 12);
+    $('project-name').value = program.name;
+    $('recipe').value = JSON.stringify(program.actions, null, 2);
+    $('project').value = program.revision;
+  }
+  async function refreshProjects() {
+    const projects = await (await fetch('/api/projects')).json();
+    $('project').replaceChildren(...projects.map(record => {
+      const option = document.createElement('option'); option.value = record.revision;
+      option.textContent = `${record.name} · ${record.revision.slice(0, 8)}`; return option;
+    }));
+  }
+  await refreshProjects(); displayProgram(selectedProgram);
+  $('project').onchange = act(async () => {
+    const response = await fetch('/api/projects/' + $('project').value);
+    if (!response.ok) throw new Error('流程版本读取失败');
+    displayProgram(await response.json()); $('editor').hidden = true;
+  });
+  $('edit').onclick = () => { $('editor').hidden = !$('editor').hidden; };
+  $('save').onclick = act(async () => {
+    const program = await post('/api/projects', { name: $('project-name').value, actions: JSON.parse($('recipe').value) });
+    await refreshProjects(); displayProgram(program); $('editor').hidden = true;
+  });
+  $('export').onclick = () => {
+    const blob = new Blob([JSON.stringify(selectedProgram, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
+    link.download = `recipe-${selectedProgram.revision.slice(0, 12)}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  };
+  $('import').onclick = () => $('import-file').click();
+  $('import-file').onchange = act(async () => {
+    const file = $('import-file').files[0]; if (!file) return;
+    if (file.size > 65536) throw new Error('流程文件不能超过 64KiB');
+    const record = JSON.parse(await file.text());
+    if (record.schema_version !== '1.0') throw new Error('不支持的流程版本');
+    const program = await post('/api/projects', { name: record.name, actions: record.actions });
+    await refreshProjects(); displayProgram(program); $('import-file').value = '';
+  });
+  $('run').onclick = act(() => {
+    $('editor').hidden = true;
+    return post('/api/run', { idempotency_key: crypto.randomUUID(), program_revision: selectedProgram.revision });
+  });
   for (const [id, command] of [['pause', 'pause'], ['resume', 'resume'], ['step', 'step_tick'], ['cancel', 'cancel']]) {
     $(id).onclick = act(() => post('/api/control', { command }));
   }

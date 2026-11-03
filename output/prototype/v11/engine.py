@@ -20,8 +20,10 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / 'v03'))
 import arm_model as arm
-from trajectory_sim import clearance, BASE
+from trajectory_sim import clearance, BASE, CONFIG as LEGACY_CONFIG
 from flow import main
+from liquid import Liquid
+from scene_geometry import SCENE
 
 DT = .02
 NAMES = [entry[0] for entry in arm.JOINTS]
@@ -32,6 +34,11 @@ def vector(node, name, default='0 0 0'):
 
 
 def load_model():
+    if (SCENE['pot']['radius_m'] * 2000 != LEGACY_CONFIG['pot_diameter_mm']
+            or SCENE['pot']['depth_m'] * 1000 != LEGACY_CONFIG['pot_depth_mm']
+            or SCENE['chicken']['center_m'][1] * 1000 != 50
+            or SCENE['chicken']['radii_m'] != [.13, .09, .075]):
+        raise MotionError('COLLISION_GEOMETRY_NOT_SUPPORTED')
     tree = ET.parse(ROOT / 'assets/so101_new_calib.urdf').getroot()
     joints = []
     for joint in tree.findall('joint'):
@@ -79,21 +86,32 @@ class MotionError(Exception):
 
 class Robot:
     def move_tcp(self, name, position_m, normal, duration_s):
-        return {'name': name, 'p': position_m, 'n': normal, 'duration_s': duration_s,
+        return {'kind': 'move_tcp', 'name': name, 'p': position_m, 'n': normal, 'duration_s': duration_s,
+                'source_line': inspect.currentframe().f_back.f_lineno}
+
+    def scoop(self, name, target_ml, duration_s):
+        return {'kind': 'scoop', 'name': name, 'target_m3': target_ml * 1e-6,
+                'duration_s': duration_s, 'source_line': inspect.currentframe().f_back.f_lineno}
+
+    def wait(self, name, duration_s):
+        return {'kind': 'wait', 'name': name, 'duration_s': duration_s,
                 'source_line': inspect.currentframe().f_back.f_lineno}
 
 
 class Engine:
-    def __init__(self, realtime=True):
+    def __init__(self, realtime=True, default_program=None):
         self.model = load_model()
         self.lock = threading.RLock()
         self.changed = threading.Condition(self.lock)
         self.incarnation = f'boot-{time.monotonic_ns()}'
-        self.config = 'fixed-S_BASE-v11'
-        self.code_source = (ROOT / 'flow.py').read_text()
+        self.config = SCENE['revision']
+        self.default_program = deepcopy(default_program)
+        self.code_source = default_program['code'] if default_program else (ROOT / 'flow.py').read_text()
         self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
         self.q = np.deg2rad([-.0386, 22.7339, 65.0816, -87.8151, 2.7893])
         self.tick = 0
+        self.action_tick = 0
+        self.liquid = Liquid()
         self.rev = 0
         self.epoch = 0
         self.paused = True
@@ -117,7 +135,7 @@ class Engine:
         p, n, _, _, links = arm.fk(self.q, BASE)
         frame = {'session_id': 'local-v11', 'incarnation': self.incarnation,
                  'state_revision': self.rev, 'configuration_revision': self.config,
-                 'tick': self.tick, 'dt_s': DT, 'simulation_time_s': round(self.tick * DT, 9),
+                 'tick': self.tick, 'action_tick': self.action_tick, 'dt_s': DT, 'simulation_time_s': round(self.tick * DT, 9),
                  'source': 'simulation', 'quality': 'ideal_kinematics',
                  'q_rad': self.q.tolist(), 'joint_names': NAMES,
                  'tcp_m': p.tolist(), 'normal_world': n.tolist(),
@@ -126,7 +144,7 @@ class Engine:
                  'job': deepcopy(self.job), 'action': deepcopy(self.action),
                  'speed': self.speed, 'code_hash': self.code_hash,
                  'electrical': {'current_a': None, 'temperature_c': None, 'quality': 'unavailable'},
-                 'liquid': {'mode': 'static_visual_only', 'height_m': .08}}
+                 'liquid': self.liquid.snapshot()}
         self.frames[self.rev] = frame
         self.history.append(self.rev)
         while len(self.history) > 6000:
@@ -151,7 +169,7 @@ class Engine:
             time.sleep(.003)
             now = time.monotonic()
             with self.lock:
-                if not self.paused and self.queue:
+                if not self.paused and (self.queue or (self.job and self.job['status'] in ('planning', 'running'))):
                     accumulator += min(now - previous, .1) * self.speed
                     while accumulator >= DT:
                         self.advance()
@@ -164,14 +182,27 @@ class Engine:
         with self.changed:
             if self.paused and not single:
                 return False
-            if not self.queue:
+            if not self.queue and not (self.job and self.job['status'] in ('planning', 'running')):
                 return False
-            sample = self.queue.popleft()
-            self.q = sample
+            moving = bool(self.queue)
+            if moving:
+                self.q = self.queue.popleft()
+                self.action_tick += 1
             self.tick += 1
-            if not self.queue:
+            p, n, *_ = arm.fk(self.q, BASE)
+            target = self.action.get('target_m3') if moving and self.action and self.action.get('kind') == 'scoop' else None
+            self.liquid.advance(DT, p, n, target)
+            if moving and not self.queue:
                 self.action['complete'] = True
-                self.event('action_completed', name=self.action['name'])
+                if self.action.get('kind') == 'scoop' and self.liquid.ladle < self.action['target_m3'] - 1e-9:
+                    self.epoch += 1
+                    self.status = 'failed'
+                    self.job.update(status='failed', error='LIQUID_UNAVAILABLE')
+                    self.paused = True
+                    self.event('job_failed', error='LIQUID_UNAVAILABLE')
+                    self.event('action_failed', name=self.action['name'], error='LIQUID_UNAVAILABLE')
+                else:
+                    self.event('action_completed', name=self.action['name'])
             self.publish()
             self.changed.notify_all()
             return True
@@ -202,9 +233,13 @@ class Engine:
             self.changed.notify_all()
             return self.snapshot()
 
-    def start(self, key, expected_configuration=None):
+    def start(self, key, expected_configuration=None, program=None):
         with self.changed:
-            request = {'configuration': expected_configuration or self.config, 'code_hash': self.code_hash}
+            program = deepcopy(program or self.default_program)
+            source = program['code'] if program else (ROOT / 'flow.py').read_text()
+            source_hash = hashlib.sha256(source.encode()).hexdigest()
+            request = {'configuration': expected_configuration or self.config, 'code_hash': source_hash,
+                       'program_revision': program['revision'] if program else 'trusted-builtin'}
             fingerprint = json.dumps(request, sort_keys=True)
             if key in self.requests:
                 old_fingerprint, job_id = self.requests[key]
@@ -219,7 +254,9 @@ class Engine:
             epoch = self.epoch
             self.next_job += 1
             job_id = f'run-{self.next_job}'
-            self.job = {'job_id': job_id, 'status': 'planning', 'code_hash': self.code_hash}
+            self.code_source, self.code_hash = source, source_hash
+            self.job = {'job_id': job_id, 'status': 'planning', 'code_hash': self.code_hash,
+                        'program_revision': request['program_revision'], 'start_action_tick': self.action_tick}
             self.status = 'planning'
             self.paused = False
             self.queue.clear()
@@ -227,10 +264,12 @@ class Engine:
             self.requests[key] = (fingerprint, job_id)
             self.event('job_created', job_id=job_id)
             self.publish()
-            threading.Thread(target=self._run, args=(epoch,), daemon=True).start()
+            threading.Thread(target=self._run, args=(epoch, program), daemon=True).start()
             return job_id
 
     def plan(self, action, start):
+        if action.get('kind') in ('wait', 'scoop'):
+            return [start.copy() for _ in range(math.ceil(action['duration_s'] / DT))], clearance(start)[0]
         p0, n0, *_ = arm.fk(start, BASE)
         target = np.asarray(action['p'], dtype=float)
         normal = np.asarray(action['n'], dtype=float)
@@ -269,9 +308,10 @@ class Engine:
             raise MotionError('LIMIT_VIOLATION')
         return result, minimum_gap
 
-    def _run(self, epoch):
+    def _run(self, epoch, program=None):
         try:
-            for action in main(Robot()):
+            actions = [{**a, 'source_line': index + 3} for index, a in enumerate(program['actions'])] if program else main(Robot())
+            for action in actions:
                 with self.changed:
                     if epoch != self.epoch:
                         return

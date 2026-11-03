@@ -1,0 +1,12 @@
+{
+  "name": "robot-control-workbench",
+  "private": true,
+  "version": "0.12.0",
+  "type": "module",
+  "scripts": {
+    "test:browser": "node output/prototype/v11/verify_browser.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}

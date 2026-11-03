@@ -6,11 +6,15 @@ import argparse
 import json
 import secrets
 
-from engine import Engine, ROOT, MotionError
+from engine import Engine, ROOT, MotionError, Robot, main
+from projects import ProjectStore
+from scene_geometry import SCENE
 
 
 def serve(port):
-    engine = Engine()
+    store = ProjectStore(ROOT.parents[2] / 'data/projects')
+    default = store.save('默认浇汁流程', [{k: v for k, v in action.items() if k != 'source_line'} for action in main(Robot())])
+    engine = Engine(default_program=default)
     token = secrets.token_urlsafe(32)
 
     class Handler(SimpleHTTPRequestHandler):
@@ -39,7 +43,12 @@ def serve(port):
             try:
                 if path.path == '/api/bootstrap':
                     return self.reply({'token': token, 'code': engine.code_source,
-                                       'model': engine.model, 'dt_s': .02})
+                                       'model': engine.model, 'scene': SCENE, 'default_program': default,
+                                       'projects': store.list(), 'dt_s': .02})
+                if path.path == '/api/projects':
+                    return self.reply(store.list())
+                if path.path.startswith('/api/projects/'):
+                    return self.reply(store.get(path.path.rsplit('/', 1)[-1]))
                 if path.path == '/api/state':
                     revision = parse_qs(path.query).get('revision', [None])[0]
                     return self.reply(engine.snapshot(int(revision) if revision is not None else None))
@@ -74,7 +83,10 @@ def serve(port):
                     key = data.get('idempotency_key')
                     if not isinstance(key, str) or not 0 < len(key) <= 200:
                         raise MotionError('INVALID_ARGUMENT')
-                    return self.reply({'job_id': engine.start(key, data.get('configuration_revision'))})
+                    program = store.get(data['program_revision']) if 'program_revision' in data else default
+                    return self.reply({'job_id': engine.start(key, data.get('configuration_revision'), program)})
+                if self.path == '/api/projects':
+                    return self.reply(store.save(data.get('name'), data.get('actions')))
                 if self.path == '/api/control':
                     return self.reply(engine.control(data.get('command')))
                 if self.path == '/api/speed':

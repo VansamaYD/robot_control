@@ -1,5 +1,6 @@
 {
-  "status": "spike verification passed",
+  "version": "0.12.0",
+  "status": "increment verified",
   "environment": {
     "python": "3.13.4",
     "numpy": "2.3.3",
@@ -7,16 +8,25 @@
     "browser": "156.0.8078.80",
     "graphics": "software SwiftShader for repeatable headless validation"
   },
-  "engine_tests": 9,
-  "browser_checks": 9,
-  "render_samples": 50,
-  "max_render_tcp_error_m": 1.8512119947305075e-16,
-  "max_render_link_matrix_error": 5.551115123125783e-16,
+  "engine_tests": 30,
+  "browser_checks": 11,
+  "render_samples": 146,
+  "max_render_tcp_error_m": 1.932809424382529e-16,
+  "max_render_link_matrix_error": 4.440892098500626e-16,
+  "max_ladle_volume_ml": 29.999999999999996,
+  "max_ledger_error_m3": 2.47198095326695e-17,
   "assets_hash_verified": 19,
-  "so_arm100_commit": "a758567c3978dfeefe282ede0500085a48fe8f78",
+  "default_run": {
+    "tick": 7229,
+    "action_tick": 2430,
+    "action_time_s": 48.6,
+    "simulation_time_s": 144.58,
+    "sampled_frames": 146,
+    "code_hash": "fbc199f466dc511ead11b27c75bc2a6386e725491ee0da39c2b7bd4b571549e0"
+  },
   "scope_exclusions": [
     "no untrusted code sandbox",
-    "no liquid transfer",
+    "uncalibrated liquid approximation",
     "no MCP",
     "no mesh collision",
     "fixed scene"

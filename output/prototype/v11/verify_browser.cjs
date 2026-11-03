@@ -4,13 +4,18 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
-const requireRuntime = createRequire('/Users/vansama/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/package.json');
-const { chromium } = requireRuntime('playwright');
+const os = require('node:os');
+let chromium;
+try { ({ chromium } = require('playwright')); }
+catch (_) {
+  const runtime = process.env.PLAYWRIGHT_PACKAGE || path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/package.json');
+  ({ chromium } = createRequire(runtime)('playwright'));
+}
 const root = __dirname;
 const evidence = path.join(root, 'evidence'); fs.mkdirSync(evidence, { recursive: true });
-const url = 'http://127.0.0.1:8765';
+const url = process.env.WORKBENCH_URL || 'http://127.0.0.1:8765';
 const report = { scope: 'trusted-code / URDF / checked motion / WebGL / exact snapshot spike',
-  tests: [], browserErrors: [], limitations: ['no untrusted code sandbox', 'no liquid transfer', 'no MCP', 'no mesh collision', 'fixed scene'], samples: [] };
+  tests: [], browserErrors: [], limitations: ['no untrusted code sandbox', 'uncalibrated liquid approximation', 'no MCP', 'no mesh collision', 'fixed scene'], samples: [] };
 let browser;
 async function check(name, fn) { const details = await fn(); report.tests.push({ name, status: 'passed', details }); console.log('PASS', name); }
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -23,7 +28,8 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
     const result = await response.json(); if (!response.ok) throw Error(result.error); return result;
   };
   const state = async () => (await fetch(url + '/api/state')).json();
-  browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  const macChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || (fs.existsSync(macChrome) ? macChrome : undefined),
     headless: true, chromiumSandbox: true, args: ['--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
   report.browserVersion = browser.version(); report.graphics = 'software SwiftShader for repeatable headless validation';
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
@@ -58,25 +64,30 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
       const s = await viewState();
       if (s.tick !== lastTick) { lastTick = s.tick; report.samples.push({ tick: s.tick, revision: s.state_revision,
         action: s.action?.name, line: s.action?.source_line, tcp_error_m: s.tcp_error_m,
-        matrix_error: s.maximum_link_matrix_error }); }
+        matrix_error: s.maximum_link_matrix_error, ladle_m3: s.liquid.ladle_m3,
+        air_m3: s.liquid.air_m3, surface_m3: s.liquid.surface_m3, balance_error_m3: s.liquid.balance_error_m3 }); }
     } catch (_) {}
   }, 120);
-  const middle = await until(async () => { const s = await state(); if (s.tick > 1000) return s; });
+  const middle = await until(async () => { const s = await state(); if (s.status === 'failed') throw Error(JSON.stringify(s.job)); if (s.liquid.air_m3 > 0) return s; });
   await page.screenshot({ path: path.join(evidence, 'workbench-running.png') });
   const finished = await until(async () => { const s = await state(); if (['succeeded', 'failed'].includes(s.status)) return s; }, 180000);
   clearInterval(sampleTimer);
-  await check('six_code_actions_complete_with_consistent_frames', async () => {
+  await check('eight_recipe_actions_complete_with_liquid_and_consistent_frames', async () => {
     assert.equal(finished.status, 'succeeded', JSON.stringify(finished.job));
-    assert.equal(finished.tick, 2270); assert.equal(finished.incarnation, boot);
+    assert.equal(finished.action_tick, 2430); assert(finished.tick >= finished.action_tick); assert.equal(finished.incarnation, boot);
     assert(report.samples.length > 5);
     assert(report.samples.every(s => s.tcp_error_m < 1e-10 && s.matrix_error < 1e-10));
     const events = await (await fetch(url + '/api/events')).json();
-    assert.equal(events.filter(event => event.event === 'action_started').length, 6);
-    assert.equal(events.filter(event => event.event === 'action_completed').length, 6);
-    const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'flow.py'))).digest('hex');
+    assert.equal(events.filter(event => event.event === 'action_started').length, 8);
+    assert.equal(events.filter(event => event.event === 'action_completed').length, 8);
+    const hash = crypto.createHash('sha256').update(bootstrap.default_program.code).digest('hex');
     assert.equal(hash, finished.code_hash);
+    assert(report.samples.some(s => s.ladle_m3 > 25e-6));
+    assert(report.samples.some(s => s.air_m3 > 0 || s.surface_m3 > 0));
+    assert(report.samples.every(s => Math.abs(s.balance_error_m3) < 1e-10));
+    assert(finished.liquid.ladle_m3 < 1e-6);
     fs.writeFileSync(path.join(evidence, 'events.json'), JSON.stringify(events, null, 2));
-    return { tick: finished.tick, simulation_time_s: finished.simulation_time_s, sampled_frames: report.samples.length, code_hash: hash };
+    return { tick: finished.tick, action_tick: finished.action_tick, action_time_s: finished.action_tick * .02, simulation_time_s: finished.simulation_time_s, sampled_frames: report.samples.length, code_hash: hash };
   });
   await check('idempotency_and_cancel_during_planning', async () => {
     const request = { idempotency_key: 'cancel-' + Date.now() };
@@ -98,6 +109,7 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
     const frame = await capture.evaluate(() => window.__frameState);
     assert.equal(frame.state_revision, middle.state_revision); assert.equal(frame.tick, middle.tick);
     assert.deepEqual(frame.q_rad, middle.q_rad); assert(frame.tcp_error_m < 1e-10);
+    assert.deepEqual(frame.liquid, middle.liquid);
     assert.notEqual(frame.state_revision, beforeCapture.state_revision);
     await capture.screenshot({ path: path.join(evidence, 'snapshot.png') });
     const after = await state(); assert.equal(after.tick, beforeCapture.tick); assert.deepEqual(after.q_rad, beforeCapture.q_rad);
@@ -132,6 +144,39 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
     const secret = await fetch(url + '/engine.py'); assert.equal(secret.status, 404);
     return {};
   });
+  const editor = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  editor.on('pageerror', error => report.browserErrors.push(String(error)));
+  await editor.goto(url); await editor.waitForFunction(() => window.__ready);
+  let savedRevision;
+  await check('ui_save_version_run_and_reopen_recipe', async () => {
+    await editor.click('#edit'); await editor.fill('#project-name', '浏览器测试流程');
+    await editor.fill('#recipe', JSON.stringify([{ kind: 'wait', name: '保存后运行', duration_s: .2 }]));
+    await editor.click('#save');
+    await editor.waitForFunction(previous => document.getElementById('project').value !== previous, bootstrap.default_program.revision);
+    savedRevision = await editor.inputValue('#project');
+    await editor.click('#run');
+    const complete = await until(async () => { const s = await state(); return s.job?.program_revision === savedRevision && s.status === 'succeeded' ? s : null; });
+    await editor.reload(); await editor.waitForFunction(() => window.__ready);
+    await editor.selectOption('#project', savedRevision);
+    await editor.waitForFunction(() => document.getElementById('source').textContent.includes('保存后运行'));
+    assert.equal(complete.job.program_revision, savedRevision);
+    return { revision: savedRevision };
+  });
+  await check('ui_export_import_preserves_validated_actions', async () => {
+    const downloading = editor.waitForEvent('download'); await editor.click('#export');
+    const download = await downloading;
+    const record = JSON.parse(fs.readFileSync(await download.path(), 'utf8'));
+    assert.equal(record.revision, savedRevision);
+    record.name = '导入测试流程'; record.code = 'raise Exception("untrusted-code")';
+    await editor.setInputFiles('#import-file', { name: 'recipe.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(record)) });
+    await editor.waitForFunction(previous => document.getElementById('project').value !== previous, savedRevision);
+    const imported = await editor.inputValue('#project');
+    const loaded = await (await fetch(url + '/api/projects/' + imported)).json();
+    assert.deepEqual(loaded.actions, record.actions); assert(!loaded.code.includes('untrusted-code'));
+    await editor.screenshot({ path: path.join(evidence, 'workbench-projects.png') });
+    return { revision: imported };
+  });
+  await editor.close();
   assert.equal(report.browserErrors.length, 0);
   report.status = 'passed';
 })().catch(error => { report.status = 'failed'; report.error = error.stack; console.error(error); process.exitCode = 1; })
