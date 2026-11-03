@@ -86,16 +86,21 @@ class EngineTests(unittest.TestCase):
     def test_empty_scoop_fails_job_without_success_event(self):
         engine = Engine(realtime=False)
         engine.liquid.initial = engine.liquid.pot = 0.
-        engine.start('empty-pot')
+        with self.assertRaisesRegex(MotionError, 'SCOOP_PRECONDITION_FAILED') as caught:
+            engine.start('empty-pot')
+        self.assertEqual(caught.exception.details['reason'], 'EMPTY_POT')
+        self.assertIsNone(engine.job)
+        from projects import code_view
+        actions = [{'kind': 'wait', 'name': 'wait', 'duration_s': .02},
+                   {'kind': 'scoop', 'name': 'scoop', 'target_m3': 30e-6, 'duration_s': .7}]
+        engine.start('runtime-empty-pot', program={'revision': 'test', 'actions': actions, 'code': code_view(actions)})
         deadline = time.monotonic() + 2
-        while not engine.queue and time.monotonic() < deadline:
-            time.sleep(.005)
-        self.assertTrue(engine.queue)
-        while engine.queue:
-            engine.advance()
+        while engine.status not in ('failed', 'succeeded') and time.monotonic() < deadline:
+            if engine.queue: engine.advance()
+            else: time.sleep(.005)
         self.assertEqual(engine.snapshot()['job']['status'], 'failed')
         self.assertEqual(engine.snapshot()['job']['error'], 'LIQUID_UNAVAILABLE')
-        self.assertFalse(any(event['event'] == 'action_completed' for event in engine.events))
+        self.assertFalse(any(event['event'] == 'action_completed' and event.get('name') == 'scoop' for event in engine.events))
 
     def test_fixed_tick_result_independent_of_observer_frequency(self):
         slow, fast = Engine(realtime=False), Engine(realtime=False)

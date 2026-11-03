@@ -74,7 +74,7 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
   clearInterval(sampleTimer);
   await check('eight_recipe_actions_complete_with_liquid_and_consistent_frames', async () => {
     assert.equal(finished.status, 'succeeded', JSON.stringify(finished.job));
-    assert.equal(finished.action_tick, 2430); assert(finished.tick >= finished.action_tick); assert.equal(finished.incarnation, boot);
+    assert.equal(finished.action_tick, 2480); assert(finished.tick >= finished.action_tick); assert.equal(finished.incarnation, boot);
     assert(report.samples.length > 5);
     assert(report.samples.every(s => s.tcp_error_m < 1e-10 && s.matrix_error < 1e-10));
     const events = await (await fetch(url + '/api/events')).json();

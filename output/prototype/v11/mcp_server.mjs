@@ -65,7 +65,7 @@ function validate(schema, args) {
     if (property.minLength && value.length < property.minLength || property.maxLength && value.length > property.maxLength || property.minimum !== undefined && value < property.minimum || property.maximum !== undefined && value > property.maximum || property.enum && !property.enum.includes(value)) throw Error('INVALID_ARGUMENT:' + key);
   }
 }
-const server = new Server({ name: 'robot-control-simulation', version: '0.13.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'robot-control-simulation', version: '0.14.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(t => t.definition) }));
 server.setRequestHandler(CallToolRequestSchema, async request => {
   try {

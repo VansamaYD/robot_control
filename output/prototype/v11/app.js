@@ -31,6 +31,7 @@ try {
   scene.background = new THREE.Color('#101a26');
   const container = $('viewport');
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.localClippingEnabled = true;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   container.append(renderer.domElement);
@@ -75,6 +76,15 @@ try {
     leg.scale.set(.035, .055, .035); leg.position.set(sign * .08, .085, .065);
   }
   const pedestal = mesh(new THREE.BoxGeometry(.16, .15, .08), material(0x243747)); pedestal.position.set(0, -.4, .04);
+  const park = geometry.parking.position_m;
+  const parkRing = mesh(new THREE.TorusGeometry(.040, .0015, 8, 64), material(0xe9bc68));
+  parkRing.position.fromArray(park);
+  const parkCanvas = document.createElement('canvas'); parkCanvas.width = 512; parkCanvas.height = 96;
+  const parkContext = parkCanvas.getContext('2d'); parkContext.fillStyle = '#ebc77f';
+  parkContext.font = '32px sans-serif'; parkContext.textAlign = 'center';
+  parkContext.fillText('翻鸡停靠点', 256, 56);
+  const parkLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(parkCanvas), depthTest: false }));
+  parkLabel.position.set(park[0], park[1], park[2] + .065); parkLabel.scale.set(.19, .036, 1); scene.add(parkLabel);
   const baseGroup = new THREE.Group();
   baseGroup.position.fromArray(model.base.slice(0, 3)); baseGroup.rotation.z = model.base[3]; scene.add(baseGroup);
   const links = new Map(model.links.map(link => [link.name, new THREE.Group()]));
@@ -119,8 +129,8 @@ try {
   const bowl = mesh(bowlGeometry, steel, toolRoot); bowl.position.fromArray(model.tool_offset_m);
   const spoonRim = mesh(new THREE.TorusGeometry(ladleRadius, .0015, 8, 48), steel, toolRoot);
   spoonRim.rotation.y = Math.PI / 2; spoonRim.position.fromArray(model.tool_offset_m);
-  const ladleLiquid = mesh(new THREE.CircleGeometry(1, 48), material(0xa45c24, { side: THREE.DoubleSide, roughness: .25 }), toolRoot);
-  ladleLiquid.rotation.y = Math.PI / 2;
+  const liquidClip = new THREE.Plane();
+  const ladleLiquid = mesh(new THREE.CircleGeometry(1, 48), material(0xa45c24, { side: THREE.DoubleSide, roughness: .25, clippingPlanes: [liquidClip] }));
   const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(.0025, 8, 8), material(0xe3a854), 128);
   scene.add(drops); drops.count = 0;
   const dropMatrix = new THREE.Matrix4();
@@ -128,9 +138,13 @@ try {
   const tcpMarker = mesh(new THREE.SphereGeometry(.004, 12, 8), material(0x85ffdc));
   const trace = mesh(new THREE.SphereGeometry(.002, 8, 8), material(0xffffff)); trace.visible = false;
   const trajectory = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x6cf0cd, transparent: true, opacity: .65 }));
+  trajectory.visible = false;
   scene.add(trajectory);
   const history = [];
   let current = null;
+  let hold = null;
+  let lastCommandError = null;
+  const retiredBoots = new Set();
   const jointRows = model.joint_order.map(name => {
     const row = document.createElement('tr');
     const nameCell = document.createElement('td'); nameCell.textContent = name; nameCell.title = name;
@@ -141,14 +155,17 @@ try {
     const buttons = [-1, 1].map(delta => {
       const button = document.createElement('button'); button.textContent = delta < 0 ? '−' : '+';
       button.setAttribute('aria-label', `${name} ${delta < 0 ? '减少' : '增加'} 1度`);
-      button.onclick = () => act(() => post('/api/manual', { joint_name: name, delta_deg: delta,
-        expected_state_revision: current.state_revision, idempotency_key: crypto.randomUUID() }))();
+      button.onpointerdown = event => beginHold(event, button, name, delta);
+      button.onpointerup = () => finishHold('released', true);
+      button.onpointercancel = () => finishHold('pointer_cancel', false);
+      button.onlostpointercapture = () => finishHold('pointer_cancel', false);
+      button.onclick = event => { if (event.detail === 0) finiteStep(name, delta); };
       commands.append(button); return button;
     });
     row.append(commands); $('joints').append(row);
     return { values, buttons };
   });
-  const labels = { ready: '就绪 · 暂停', planning: '计算并检查轨迹', running: '执行中', succeeded: '流程完成', cancelled: '已取消', failed: '执行失败' };
+  const labels = { ready: '就绪 · 暂停', planning: '计算并检查轨迹', running: '执行中', succeeded: '流程完成', cancelled: '已取消', failed: '执行失败', waiting_operator: '等待翻鸡操作' };
   function drawState(state) {
     model.joint_order.forEach((name, i) => {
       const pivot = pivots.get(name);
@@ -175,7 +192,9 @@ try {
     const fillHeight = (low + high) / 2;
     const fillRadius = Math.sqrt(Math.max(0, 2 * ladleRadius * fillHeight - fillHeight * fillHeight));
     ladleLiquid.visible = liquid.ladle_m3 > 1e-10;
-    ladleLiquid.position.fromArray(model.tool_offset_m); ladleLiquid.position.x += -ladleRadius + fillHeight;
+    ladleLiquid.position.copy(position); ladleLiquid.position.z += -ladleRadius + fillHeight;
+    const normal = new THREE.Vector3(...state.normal_world);
+    liquidClip.normal.copy(normal).negate(); liquidClip.constant = normal.dot(position);
     ladleLiquid.scale.set(fillRadius, fillRadius, 1);
     drops.count = Math.min(128, liquid.packets.length);
     liquid.packets.slice(0, 128).forEach((packet, index) => {
@@ -189,16 +208,20 @@ try {
       const row = document.createElement('div'), title = document.createElement('span'), value = document.createElement('b');
       title.textContent = label; value.textContent = (amount * 1e6).toFixed(3) + ' mL'; row.append(title, value); return row;
     }));
-    if (!current || state.tick !== current.tick) {
+    if (current && current.incarnation !== state.incarnation) {
+      history.length = 0;
+      $('snapshot-preview').hidden = true; $('snapshot-download').hidden = true;
+    }
+    if (!current || state.tick !== current.tick || state.incarnation !== current.incarnation) {
       history.push(position.clone()); if (history.length > 4000) history.shift();
       trajectory.geometry.dispose(); trajectory.geometry = new THREE.BufferGeometry().setFromPoints(history);
     }
     current = state;
-    $('status').textContent = state.paused && ['planning', 'running'].includes(state.job?.status) ? '已暂停' : labels[state.status] ?? state.status;
-    $('connection').textContent = `${visualCount} 个网格 · ${state.job?.origin === 'mcp' ? 'MCP任务' : state.job?.origin === 'manual' ? '手动任务' : '本地流程'} · 服务在线`;
+    $('status').textContent = state.job?.preplanning ? '检查完整路线 · 时钟暂停' : state.paused && ['planning', 'running'].includes(state.job?.status) ? '已暂停' : labels[state.status] ?? state.status;
+    $('connection').textContent = `${visualCount} 个网格 · ${state.job?.origin === 'mcp' ? 'MCP任务' : ['manual', 'jog'].includes(state.job?.origin) ? '手动任务' : '本地流程'} · 服务在线`;
     $('frame').textContent = `快照 #${state.state_revision} · tick ${state.tick}`;
     $('time').textContent = `${state.simulation_time_s.toFixed(2)} s`;
-    $('action').textContent = state.action?.name ?? '待机 · 初始暂停';
+    $('action').textContent = state.status === 'waiting_operator' ? '模拟停靠完成；操作后点击“回取汁位”' : state.action?.name ?? '待机 · 初始暂停';
     $('hash').textContent = state.code_hash.slice(0, 12);
     $('tcp').textContent = state.tcp_m.map(value => (value * 1000).toFixed(1)).join(', ');
     state.joint_names.forEach((name, i) => {
@@ -210,15 +233,18 @@ try {
       position.title = `限位 ${state.joint_limits_rad[i].map(value => (value * 180 / Math.PI).toFixed(1)).join(' 至 ')}°`;
     });
     document.querySelectorAll('#source div').forEach(row => row.classList.toggle('active', state.job?.program_revision === selectedProgram.revision && Number(row.dataset.line) === state.action?.source_line));
-    const busy = ['planning', 'running'].includes(state.job?.status);
-    jointRows.forEach(row => row.buttons.forEach(button => { button.disabled = busy; }));
+    const busy = ['planning', 'running', 'waiting_operator'].includes(state.job?.status);
+    jointRows.forEach(row => row.buttons.forEach(button => { button.disabled = busy && state.job?.origin !== 'jog'; }));
     $('run').disabled = busy;
     $('pause').disabled = !busy || state.paused;
-    $('resume').disabled = !busy || !state.paused;
-    $('step').disabled = !busy || !state.paused;
+    $('resume').disabled = !busy || !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
+    $('step').disabled = !busy || !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
     $('cancel').disabled = !busy;
+    $('home').disabled = busy && state.status !== 'waiting_operator';
+    $('dock').disabled = busy;
     for (const id of ['project', 'edit', 'save', 'import']) $(id).disabled = busy;
-    $('error').textContent = state.job?.error ?? '';
+    $('error').textContent = state.job?.error ? describeError(state.job.error, state.job.error_details) : lastCommandError ?? '';
+    $('readiness').textContent = state.scoop_readiness?.ready ? '取汁前检查：位置与姿态可用' : '取汁前检查：' + describeReason(state.scoop_readiness);
     window.__frameState = { ...state, rendered_tcp_m: position.toArray(), tcp_error_m: error,
       maximum_link_matrix_error: Math.max(...linkErrors), visual_mesh_count: visualCount,
       camera: { position: camera.position.toArray(), target: controls.target.toArray(), up: camera.up.toArray(), fov: camera.fov } };
@@ -229,8 +255,12 @@ try {
     const response = await fetch('/api/state' + query);
     const state = await response.json();
     if (!response.ok) throw new Error(state.error);
+    if (current && current.incarnation !== state.incarnation) {
+      if (retiredBoots.has(state.incarnation)) return;
+      retiredBoots.add(current.incarnation);
+    }
     if (current && current.incarnation === state.incarnation && state.state_revision < current.state_revision) return;
-    if (['planning', 'running'].includes(state.job?.status) && state.job.origin !== 'manual' && state.job.program_revision !== selectedProgram.revision) {
+    if (['planning', 'running'].includes(state.job?.status) && !['manual', 'jog', 'recovery'].includes(state.job.origin) && state.job.program_revision !== selectedProgram.revision) {
       const programResponse = await fetch('/api/projects/' + state.job.program_revision);
       if (!programResponse.ok) throw new Error('运行版本不可读取');
       displayProgram(await programResponse.json());
@@ -240,15 +270,77 @@ try {
   async function post(path, data) {
     const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Session-Token': bootstrap.token }, body: JSON.stringify(data) });
     const result = await response.json();
-    if (!response.ok) throw new Error(result.error);
+    if (!response.ok) { const error = new Error(result.error); error.details = result.details; throw error; }
     return result;
   }
   const act = (callback) => async () => {
-    try { $('error').textContent = ''; await callback(); await update(); }
-    catch (error) { $('error').textContent = error.message; window.__errors.push(error.message); }
+    try { lastCommandError = null; $('error').textContent = ''; await callback(); await update(); }
+    catch (error) { lastCommandError = describeError(error.message, error.details); $('error').textContent = lastCommandError; window.__errors.push(error.message); }
   };
+  function describeReason(details) {
+    if (!details) return '等待状态';
+    const messages = { READY: '未取足目标量，请检查取汁时长', LADLE_TILTED: `勺口倾斜 ${details.tilt_deg?.toFixed(1)}°，请先回取汁位`,
+      EMPTY_POT: '锅中无可用汤汁', ABOVE_LIQUID: '勺子未浸入汤汁', SCOOP_REGION_BLOCKED: '取汁位置受锅壁或鸡肉限制，请回取汁位',
+      INSUFFICIENT_SUBMERSION: '浸入深度不足', INSUFFICIENT_POT_VOLUME: '锅中有效汁量不足' };
+    return messages[details.reason] ?? details.reason;
+  }
+  function describeError(code, details) {
+    if (['LIQUID_UNAVAILABLE', 'SCOOP_PRECONDITION_FAILED'].includes(code)) return `${describeReason(details)}。可“回取汁位”保留汤汁恢复，或“重置仿真”。`;
+    const messages = { RECOVERY_PATH_UNAVAILABLE: '没有找到通过检查的恢复路线；未移动。可重置仿真。', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
+    return messages[code] ?? code;
+  }
+  function finiteStep(name, delta) {
+    act(() => post('/api/manual', { joint_name: name, delta_deg: delta, expected_state_revision: current.state_revision, idempotency_key: crypto.randomUUID() }))();
+  }
+  function beginHold(event, button, name, direction) {
+    if (event.button !== 0 || hold) return;
+    button.setPointerCapture(event.pointerId);
+    const session = { name, direction, released: false, started: false, lease: null, timer: null, heartbeat: null, stopped: false };
+    hold = session;
+    session.timer = setTimeout(async () => {
+      session.started = true;
+      try {
+        lastCommandError = null;
+        const result = await post('/api/jog/start', { joint_name: name, direction, incarnation: current.incarnation, idempotency_key: crypto.randomUUID() });
+        session.lease = result.lease_token;
+        if (session.released) { await stopHoldSession(session, session.reason); return; }
+        session.heartbeat = setInterval(async () => {
+          if (session.released) return;
+          try { await post('/api/jog/heartbeat', { lease_token: session.lease }); }
+          catch (error) { if (!session.released) { finishHold('pointer_cancel', false); lastCommandError = '点动租约失效或到达边界，已停止'; } }
+        }, result.heartbeat_interval_ms);
+        await update();
+      } catch (error) {
+        if (!session.released) { lastCommandError = describeError(error.message, error.details); finishHold('pointer_cancel', false); }
+      }
+    }, 200);
+  }
+  async function stopHoldSession(session, reason = 'released') {
+    if (session.stopped || !session.lease) return;
+    session.stopped = true;
+    clearInterval(session.heartbeat);
+    try {
+      await fetch('/api/jog/stop', { method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'X-Session-Token': bootstrap.token },
+        body: JSON.stringify({ lease_token: session.lease, reason }) });
+    } catch (_) { /* Server lease expiry is independent of the browser. */ }
+  }
+  function finishHold(reason, allowClick) {
+    const session = hold; if (!session) return;
+    hold = null; session.released = true; session.reason = reason;
+    clearTimeout(session.timer); clearInterval(session.heartbeat);
+    if (session.started) stopHoldSession(session, reason);
+    else if (allowClick) finiteStep(session.name, session.direction);
+  }
+  window.addEventListener('blur', () => finishHold('blur', false));
+  window.addEventListener('pagehide', () => finishHold('pagehide', false));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) finishHold('hidden', false); });
   function displayProgram(program) {
     selectedProgram = program;
+    if (![...$('project').options].some(option => option.value === program.revision)) {
+      const option = document.createElement('option'); option.value = program.revision;
+      option.textContent = `${program.name} · ${program.revision.slice(0, 8)}`; $('project').append(option);
+    }
     showCode(program.code);
     $('program-revision').textContent = program.revision.slice(0, 12);
     $('project-name').value = program.name;
@@ -291,6 +383,19 @@ try {
   $('run').onclick = act(() => {
     $('editor').hidden = true;
     return post('/api/run', { idempotency_key: crypto.randomUUID(), program_revision: selectedProgram.revision });
+  });
+  $('trace').onclick = () => {
+    trajectory.visible = !trajectory.visible;
+    $('trace').textContent = trajectory.visible ? '隐藏轨迹' : '显示轨迹';
+  };
+  for (const [id, mode] of [['home', 'home'], ['dock', 'dock']]) {
+    $(id).onclick = act(() => post('/api/preset', { mode, incarnation: current.incarnation, idempotency_key: crypto.randomUUID() }));
+  }
+  $('reset').onclick = () => $('reset-dialog').showModal();
+  $('reset-cancel').onclick = () => $('reset-dialog').close();
+  $('reset-confirm').onclick = act(async () => {
+    $('reset-dialog').close();
+    await post('/api/reset', { incarnation: current.incarnation, confirmation: 'RESET_SIMULATION' });
   });
   $('snapshot').onclick = act(async () => {
     $('snapshot').disabled = true;

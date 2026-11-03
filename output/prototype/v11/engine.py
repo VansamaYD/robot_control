@@ -26,6 +26,9 @@ from flow import main
 from liquid import Liquid
 from scene_geometry import SCENE
 from projects import code_view
+from errors import MotionError
+from jog_control import JogMixin
+from presets import HOME_Q, DOCK, recovery_candidates
 
 DT = .02
 NAMES = [entry[0] for entry in arm.JOINTS]
@@ -82,10 +85,6 @@ def load_model():
             'scope': 'official meshes, custom assumed ladle; no mesh collision'}
 
 
-class MotionError(Exception):
-    pass
-
-
 class Robot:
     def move_joints(self, name, q_rad, duration_s):
         return {'kind': 'move_joints', 'name': name, 'q_rad': q_rad, 'duration_s': duration_s,
@@ -104,7 +103,7 @@ class Robot:
                 'source_line': inspect.currentframe().f_back.f_lineno}
 
 
-class Engine:
+class Engine(JogMixin):
     def __init__(self, realtime=True, default_program=None):
         self.model = load_model()
         self.lock = threading.RLock()
@@ -114,7 +113,7 @@ class Engine:
         self.default_program = deepcopy(default_program)
         self.code_source = default_program['code'] if default_program else (ROOT / 'flow.py').read_text()
         self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
-        self.q = np.deg2rad([-.0386, 22.7339, 65.0816, -87.8151, 2.7893])
+        self.q = HOME_Q.copy()
         self.target_q = self.q.copy()
         self.velocity = np.zeros(5)
         self.tick = 0
@@ -135,6 +134,9 @@ class Engine:
         self.next_job = 0
         self.requests = {}
         self.manual_requests = {}
+        self.jog_requests = {}
+        self.preset_requests = {}
+        self.jog = None
         self.shutdown = False
         self.publish()
         if realtime:
@@ -157,6 +159,10 @@ class Engine:
                  'speed': self.speed, 'code_hash': self.code_hash,
                  'electrical': {'current_a': None, 'temperature_c': None, 'quality': 'unavailable'},
                  'liquid': self.liquid.snapshot()}
+        frame['scoop_readiness'] = self.liquid.scoop_diagnostics(p, n, 30e-6)
+        frame['jog'] = {'active': self.jog is not None, 'speed_deg_s': 4, 'lease_timeout_ms': 350}
+        frame['parking'] = {'target_m': DOCK, 'virtual_parked': bool(np.linalg.norm(p-DOCK) < .001),
+                            'support_contact_validated': False}
         self.frames[self.rev] = frame
         self.history.append(self.rev)
         while len(self.history) > 6000:
@@ -171,7 +177,7 @@ class Engine:
             return deepcopy(frame)
 
     def event(self, event_name, **details):
-        self.events.append({'seq': len(self.events) + 1, 'tick': self.tick,
+        self.events.append({'seq': len(self.events) + 1, 'tick': self.tick, 'incarnation': self.incarnation,
                             'event': event_name, **details})
 
     def get_job(self, job_id):
@@ -187,8 +193,9 @@ class Engine:
             time.sleep(.003)
             now = time.monotonic()
             with self.lock:
+                self.expire_jog(now)
                 if not self.paused and (self.queue or (self.job and self.job['status'] in ('planning', 'running'))):
-                    accumulator += min(now - previous, .1) * self.speed
+                    accumulator += min(now - previous, .1) * (1 if self.jog else self.speed)
                     while accumulator >= DT:
                         self.advance()
                         accumulator -= DT
@@ -204,7 +211,11 @@ class Engine:
                 return False
             moving = bool(self.queue)
             previous_q = self.q.copy()
-            if moving:
+            jogging = self.jog is not None
+            if jogging:
+                if not self.advance_jog(DT):
+                    return False
+            elif moving:
                 self.q = self.queue.popleft()
                 self.action_tick += 1
             self.velocity = (self.q - previous_q) / DT
@@ -217,7 +228,8 @@ class Engine:
                 if self.action.get('kind') == 'scoop' and self.liquid.ladle < self.action['target_m3'] - 1e-9:
                     self.epoch += 1
                     self.status = 'failed'
-                    self.job.update(status='failed', error='LIQUID_UNAVAILABLE')
+                    self.job.update(status='failed', error='LIQUID_UNAVAILABLE',
+                                    error_details=self.liquid.scoop_diagnostics(p, n, self.action['target_m3']))
                     self.paused = True
                     self.event('job_failed', error='LIQUID_UNAVAILABLE')
                     self.event('action_failed', name=self.action['name'], error='LIQUID_UNAVAILABLE')
@@ -238,22 +250,33 @@ class Engine:
                 raise MotionError('JOB_NOT_ACTIVE')
             if self.job and self.job['principal'] != principal and principal != 'ui':
                 raise MotionError('NOT_AUTHORIZED')
+            if self.jog and command in ('pause', 'cancel'):
+                self._finish_jog('operator_' + command)
+                return self.snapshot()
             if command == 'pause':
                 self.paused = True
                 self.velocity[:] = 0
+                if self.job and self.job.get('preplanning'):
+                    self.job['start_after_planning'] = False
             elif command == 'resume':
                 if not self.job or self.job['status'] not in ('running', 'planning'):
                     raise MotionError('NO_ACTIVE_JOB')
                 self.paused = False
+                if self.job.get('preplanning'):
+                    self.job['start_after_planning'] = True
+                    self.paused = True
             elif command == 'step_tick':
+                if self.job and self.job.get('preplanning'):
+                    raise MotionError('PREFLIGHT_BUSY')
                 if not self.paused:
                     raise MotionError('NOT_PAUSED')
                 self.advance(single=True)
             elif command == 'cancel':
                 self.epoch += 1
                 self.queue.clear()
-                if self.job and self.job['status'] in ('planning', 'running'):
+                if self.job and self.job['status'] in ('planning', 'running', 'waiting_operator'):
                     self.job['status'] = 'cancelled'
+                    self.job['preplanning'] = False
                 self.status = 'cancelled'
                 self.paused = True
                 self.target_q = self.q.copy()
@@ -301,8 +324,14 @@ class Engine:
                 return job_id
             if request['configuration'] != self.config:
                 raise MotionError('CONFIGURATION_CHANGED')
-            if self.job and self.job['status'] in ('planning', 'running'):
+            if self.job and self.job['status'] in ('planning', 'running', 'waiting_operator'):
                 raise MotionError('CONTROL_BUSY')
+            first = program['actions'][0] if program and program.get('actions') else next(main(Robot())) if not program else None
+            if first and first['kind'] == 'scoop':
+                p, n, *_ = arm.fk(self.q, BASE)
+                readiness = self.liquid.scoop_diagnostics(p, n, first['target_m3'])
+                if not readiness['ready']:
+                    raise MotionError('SCOOP_PRECONDITION_FAILED', readiness)
             self.epoch += 1
             epoch = self.epoch
             self.next_job += 1
@@ -314,12 +343,61 @@ class Engine:
             self.jobs[job_id] = self.job
             self.status = 'planning'
             self.paused = False
+            if program and program.get('preset'):
+                self.job.update(preplanning=True, start_after_planning=True, preset=program['preset'])
+                self.paused = True
             self.queue.clear()
             self.action = None
             self.requests[scope] = (fingerprint, job_id)
             self.event('job_created', job_id=job_id)
             self.publish()
             threading.Thread(target=self._run, args=(epoch, program), daemon=True).start()
+            return job_id
+
+    def reset_simulation(self, incarnation, confirmation):
+        with self.changed:
+            if incarnation != self.incarnation or confirmation != 'RESET_SIMULATION':
+                raise MotionError('RESET_CONFIRMATION_REQUIRED')
+            if self.jog:
+                self._finish_jog('simulation_reset')
+            if self.job and self.job['status'] in ('planning', 'running', 'waiting_operator'):
+                self.job.update(status='cancelled', end_reason='simulation_reset')
+            self.epoch += 1
+            self.queue.clear()
+            self.incarnation = 'boot-' + uuid.uuid4().hex
+            self.q = HOME_Q.copy()
+            self.target_q = self.q.copy()
+            self.velocity[:] = 0
+            self.liquid = Liquid()
+            self.tick = self.action_tick = self.rev = 0
+            self.frames.clear(); self.history.clear()
+            self.job = self.action = None
+            self.status = 'ready'
+            self.paused = True
+            self.code_source = self.default_program['code'] if self.default_program else (ROOT/'flow.py').read_text()
+            self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
+            self.event('simulation_reset')
+            return self.publish()
+
+    def start_preset(self, mode, key, incarnation):
+        with self.changed:
+            fingerprint = json.dumps([mode, incarnation])
+            if key in self.preset_requests:
+                old, job_id = self.preset_requests[key]
+                if old != fingerprint:
+                    raise MotionError('IDEMPOTENCY_CONFLICT')
+                return job_id
+            if mode not in ('home', 'dock') or incarnation != self.incarnation:
+                raise MotionError('INVALID_PRESET_CONTEXT')
+            if self.job and self.job['status'] == 'waiting_operator' and mode == 'home':
+                self.job.update(status='succeeded', end_reason='operator_handoff')
+                self.epoch += 1
+            p, n, *_ = arm.fk(self.q, BASE)
+            candidates = recovery_candidates(mode, p.tolist(), n.tolist(), self.liquid.ladle)
+            program = {'revision': 'preset-' + mode, 'code': '# Checked system preset: ' + mode,
+                       'actions': [], 'preset': mode, 'candidates': candidates}
+            job_id = self.start('preset:'+key, program=program, origin='recovery')
+            self.preset_requests[key] = (fingerprint, job_id)
             return job_id
 
     def plan(self, action, start):
@@ -387,8 +465,39 @@ class Engine:
 
     def _run(self, epoch, program=None):
         try:
+            prepared = None
+            if program and program.get('preset'):
+                with self.changed:
+                    initial_q = self.q.copy()
+                failures = []
+                for candidate in program['candidates']:
+                    try:
+                        paths, q = [], initial_q.copy()
+                        for item in candidate:
+                            with self.changed:
+                                if epoch != self.epoch:
+                                    return
+                            path, gap = self.plan(item, q)
+                            q = path[-1]
+                            paths.append((path, gap))
+                        prepared = paths
+                        program['actions'] = candidate
+                        break
+                    except MotionError as error:
+                        failures.append(str(error))
+                if prepared is None:
+                    raise MotionError('RECOVERY_PATH_UNAVAILABLE', {'candidates': failures})
+                with self.changed:
+                    if epoch != self.epoch:
+                        return
+                    if not np.allclose(initial_q, self.q, atol=1e-12):
+                        raise MotionError('START_STATE_CHANGED')
+                    self.code_source = code_view(program['actions'])
+                    self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
+                    self.job.update(code_hash=self.code_hash, preplanning=False)
+                    self.paused = not self.job['start_after_planning']
             actions = [{**a, 'source_line': index + 3} for index, a in enumerate(program['actions'])] if program else main(Robot())
-            for action in actions:
+            for index, action in enumerate(actions):
                 with self.changed:
                     if epoch != self.epoch:
                         return
@@ -397,7 +506,7 @@ class Engine:
                     self.job['status'] = 'planning'
                     self.action = {**action, 'complete': False}
                     self.publish()
-                path, gap = self.plan(action, start)
+                path, gap = prepared[index] if prepared is not None else self.plan(action, start)
                 with self.changed:
                     if epoch != self.epoch:
                         return
@@ -417,12 +526,17 @@ class Engine:
                         return
             with self.changed:
                 if epoch == self.epoch:
-                    self.status = 'succeeded'
-                    self.job['status'] = 'succeeded'
+                    if program and program.get('preset') == 'dock':
+                        p, n, *_ = arm.fk(self.q, BASE)
+                        if np.linalg.norm(p-DOCK) > .001 or n[2] < .99 or self.liquid.ladle > .5e-6:
+                            raise MotionError('PARK_CONDITIONS_NOT_MET')
+                        self.status = self.job['status'] = 'waiting_operator'
+                    else:
+                        self.status = self.job['status'] = 'succeeded'
                     self.paused = True
                     self.velocity[:] = 0
                     self.epoch += 1
-                    self.event('job_succeeded')
+                    self.event('waiting_operator' if self.status == 'waiting_operator' else 'job_succeeded')
                     self.publish()
         except Exception as error:
             with self.changed:
@@ -430,7 +544,9 @@ class Engine:
                     self.queue.clear()
                     self.status = 'failed'
                     self.job['status'] = 'failed'
+                    self.job['preplanning'] = False
                     self.job['error'] = str(error)
+                    self.job['error_details'] = getattr(error, 'details', None)
                     self.paused = True
                     self.velocity[:] = 0
                     self.target_q = self.q.copy()

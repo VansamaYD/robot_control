@@ -2,12 +2,14 @@
   {
     "seq": 1,
     "tick": 0,
+    "incarnation": "boot-958572916442333",
     "event": "job_created",
-    "job_id": "run-40bedc777e2d44948f78b3914a2815fd"
+    "job_id": "run-dfc8747702ae432981d97d38a3f1a856"
   },
   {
     "seq": 2,
-    "tick": 8,
+    "tick": 4,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "舀取 30mL 汤汁",
     "line": 3,
@@ -15,13 +17,15 @@
   },
   {
     "seq": 3,
-    "tick": 43,
+    "tick": 39,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "舀取 30mL 汤汁"
   },
   {
     "seq": 4,
-    "tick": 1239,
+    "tick": 1073,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "提勺",
     "line": 4,
@@ -29,13 +33,15 @@
   },
   {
     "seq": 5,
-    "tick": 1849,
+    "tick": 1683,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "提勺"
   },
   {
     "seq": 6,
-    "tick": 2788,
+    "tick": 2371,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "移到鸡背上方",
     "line": 5,
@@ -43,83 +49,95 @@
   },
   {
     "seq": 7,
-    "tick": 3113,
+    "tick": 2696,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "移到鸡背上方"
   },
   {
     "seq": 8,
-    "tick": 3614,
+    "tick": 3237,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
-    "name": "倾斜汤勺",
+    "name": "倾斜汤勺 65°",
     "line": 6,
     "clearance_m": 0.012499999994077589
   },
   {
     "seq": 9,
-    "tick": 3814,
+    "tick": 3487,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
-    "name": "倾斜汤勺"
+    "name": "倾斜汤勺 65°"
   },
   {
     "seq": 10,
-    "tick": 3819,
+    "tick": 3491,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "保持倾角淋汁",
     "line": 7,
-    "clearance_m": 0.012506914298005413
+    "clearance_m": 0.012578362872237576
   },
   {
     "seq": 11,
-    "tick": 3944,
+    "tick": 3616,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "保持倾角淋汁"
   },
   {
     "seq": 12,
-    "tick": 4401,
+    "tick": 4153,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "汤勺回正",
     "line": 8,
-    "clearance_m": 0.012500000004753688
+    "clearance_m": 0.012500000010180541
   },
   {
     "seq": 13,
-    "tick": 4601,
+    "tick": 4353,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "汤勺回正"
   },
   {
     "seq": 14,
-    "tick": 5411,
+    "tick": 5086,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "返回取汁上方",
     "line": 9,
-    "clearance_m": 0.012499382784377518
+    "clearance_m": 0.012499382788396997
   },
   {
     "seq": 15,
-    "tick": 5736,
+    "tick": 5411,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "返回取汁上方"
   },
   {
     "seq": 16,
-    "tick": 7219,
+    "tick": 6715,
+    "incarnation": "boot-958572916442333",
     "event": "action_started",
     "name": "下降到取汁点",
     "line": 10,
-    "clearance_m": 0.007518459868842146
+    "clearance_m": 0.00751845986884218
   },
   {
     "seq": 17,
-    "tick": 7829,
+    "tick": 7325,
+    "incarnation": "boot-958572916442333",
     "event": "action_completed",
     "name": "下降到取汁点"
   },
   {
     "seq": 18,
-    "tick": 7830,
+    "tick": 7326,
+    "incarnation": "boot-958572916442333",
     "event": "job_succeeded"
   }
 ]

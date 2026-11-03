@@ -54,8 +54,9 @@ def serve(port):
                                        'model': engine.model, 'scene': SCENE, 'default_program': default,
                                        'projects': store.list(), 'dt_s': .02})
                 if path.path == '/api/capabilities':
-                    return self.reply({'version': '0.13.0', 'mode': 'simulation', 'mcp_stdio': True,
+                    return self.reply({'version': '0.14.0', 'mode': 'simulation', 'mcp_stdio': True,
                                        'render_snapshot': True, 'manual_joint_steps': True,
+                                       'leased_jog': True, 'recovery_presets': True,
                                        'arbitrary_python': False, 'hardware': False, 'vision': False})
                 if path.path == '/api/projects':
                     return self.reply(store.list())
@@ -124,6 +125,22 @@ def serve(port):
                     if not isinstance(key, str) or not 0 < len(key) <= 200:
                         raise MotionError('INVALID_ARGUMENT')
                     return self.reply({'job_id': engine.manual(data.get('joint_name'), data.get('delta_deg'), key, data.get('expected_state_revision'))})
+                if self.path in ('/api/jog/start', '/api/jog/heartbeat', '/api/jog/stop', '/api/preset', '/api/reset'):
+                    if client['principal'] != 'ui':
+                        raise MotionError('NOT_AUTHORIZED')
+                    if self.path in ('/api/jog/start', '/api/preset'):
+                        key = data.get('idempotency_key')
+                        if not isinstance(key, str) or not 0 < len(key) <= 200:
+                            raise MotionError('INVALID_ARGUMENT')
+                    if self.path == '/api/jog/start':
+                        return self.reply(engine.start_jog(data.get('joint_name'), data.get('direction'), key, data.get('incarnation')))
+                    if self.path == '/api/jog/heartbeat':
+                        return self.reply(engine.heartbeat_jog(data.get('lease_token')))
+                    if self.path == '/api/jog/stop':
+                        return self.reply(engine.stop_jog(data.get('lease_token'), data.get('reason', 'released')))
+                    if self.path == '/api/preset':
+                        return self.reply({'job_id': engine.start_preset(data.get('mode'), key, data.get('incarnation'))})
+                    return self.reply(engine.reset_simulation(data.get('incarnation'), data.get('confirmation')))
                 if self.path == '/api/images':
                     return self.reply(renderer.render(data.get('state_revision'), data.get('width', 1280), data.get('height', 720), data.get('view', 'default'), data.get('incarnation')))
                 if self.path == '/api/validate':
@@ -158,7 +175,7 @@ def serve(port):
                     return self.reply({'speed': speed})
                 return self.reply({'error': 'NOT_FOUND'}, 404)
             except (ValueError, TypeError, MotionError) as error:
-                return self.reply({'error': str(error)}, 409)
+                return self.reply({'error': str(error), 'details': getattr(error, 'details', None)}, 409)
 
     server = ThreadingHTTPServer(('127.0.0.1', port), Handler)
     print(f'Chain prototype: http://127.0.0.1:{port}', flush=True)

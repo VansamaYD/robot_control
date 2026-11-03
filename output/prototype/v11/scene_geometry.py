@@ -4,7 +4,9 @@ import numpy as np
 
 
 SCENE = {
-    'schema_version': '1.0', 'revision': 'S_BASE-geometry-1',
+    'schema_version': '1.0', 'revision': 'S_BASE-geometry-2',
+    'parking': {'position_m': [-.240, -.300, .195], 'above_m': [-.240, -.300, .220],
+                'label': '模拟翻鸡停靠点', 'support_contact_validated': False},
     'pot': {'radius_m': .2, 'depth_m': .12, 'profile': 'spherical_cap'},
     'chicken': {'center_m': [0, .05, .075], 'radii_m': [.13, .09, .075],
                 'displacement': 'pot-clipped ellipsoid, numerical quadrature',
@@ -78,11 +80,22 @@ class Geometry:
         submerged = min(radius, max(0., height - (tcp[2] - radius)))
         if submerged == 0:
             return 0.
-        if math.hypot(tcp[0], tcp[1]) + radius > self.pot_radius(max(.001, tcp[2] - radius)):
-            return 0.
+        # The bowl is hemispherical, not a full-radius cylinder at its bottom.
+        # Its bottom cross-section has zero radius; the old test rejected valid
+        # manually shifted poses near the curved wall.
+        for d in np.linspace(0., radius, 13):
+            z = tcp[2] - radius + d
+            cross_radius = math.sqrt(max(0., 2*radius*d-d*d))
+            if z < 0 or math.hypot(tcp[0], tcp[1]) + cross_radius > self.pot_radius(max(.001, z)):
+                return 0.
         # Conservative free-region check at the liquid height, with bowl footprint.
         point = np.array([tcp[0], tcp[1], min(height, tcp[2])])
         distance = np.linalg.norm((point[:2] - self.center[:2]) / (self.radii[:2] + radius))
         if distance <= 1:
             return 0.
         return math.pi * submerged**2 * (radius - submerged / 3)
+
+    def submerged(self, point, height):
+        return (0 <= point[2] <= height and
+                math.hypot(point[0], point[1]) <= self.pot_radius(point[2]) and
+                not self.inside_chicken(point))

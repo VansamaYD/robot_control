@@ -22,6 +22,35 @@ class Liquid:
     def total(self):
         return self.pot + self.ladle + self.surface + self.spill + sum(p['v'] for p in self.packets)
 
+    def scoop_diagnostics(self, tcp, normal, target):
+        angle = math.degrees(math.acos(float(np.clip(normal[2], -1, 1))))
+        available = self.geometry.scoop_capacity(tcp, normal, self.height)
+        reason = 'READY'
+        if self.pot <= 1e-12:
+            reason = 'EMPTY_POT'
+        elif angle > math.degrees(math.acos(.95)):
+            reason = 'LADLE_TILTED'
+        elif tcp[2] - SCENE['ladle']['radius_m'] >= self.height:
+            reason = 'ABOVE_LIQUID'
+        elif available <= 1e-12:
+            reason = 'SCOOP_REGION_BLOCKED'
+        elif available + 1e-9 < target:
+            reason = 'INSUFFICIENT_SUBMERSION'
+        elif self.pot + self.ladle + 1e-9 < target:
+            reason = 'INSUFFICIENT_POT_VOLUME'
+        return {'ready': reason == 'READY', 'reason': reason, 'tilt_deg': angle,
+                'tcp_m': np.asarray(tcp).tolist(), 'liquid_height_m': self.height,
+                'pot_m3': self.pot, 'ladle_m3': self.ladle,
+                'requested_m3': target, 'geometric_capacity_m3': available,
+                'suggestion': 'return_home_or_reset_simulation' if reason != 'READY' else None}
+
+    def retained_capacity(self, normal):
+        # Quasi-static hemispherical cup: volume below its lowest rim point.
+        angle = math.acos(float(np.clip(normal[2], -1, 1)))
+        r = SCENE['ladle']['radius_m']
+        h = r * max(0., 1 - math.sin(min(math.pi/2, angle))) if angle < math.pi/2 else 0.
+        return math.pi * h*h * (r - h/3)
+
     def advance(self, dt, tcp, normal, scoop_target=None):
         if not math.isfinite(dt) or not 0 < dt <= .1:
             raise ValueError('INVALID_LIQUID_TIMESTEP')
@@ -33,14 +62,27 @@ class Liquid:
             self.pot -= amount
             self.ladle += amount
         angle = math.acos(float(np.clip(normal[2], -1, 1)))
-        if angle > math.radians(25) and self.ladle > 0:
-            flow = 40e-6 * max(0., math.sin(min(math.pi/2, angle - math.radians(25))))
-            volume = min(self.ladle, flow * dt)
-            self.ladle -= volume
-            self.packets.append({'p': tcp.copy(), 'velocity': np.array([0., 0., -.05]), 'v': volume})
+        excess = max(0., self.ladle - self.retained_capacity(normal))
+        if excess > 0:
+            flow = 80e-6 * math.sin(min(math.pi/2, angle)) * math.sqrt(excess/self.capacity)
+            volume = min(excess, flow * dt)
+            down = np.array([0., 0., -1.])
+            rim_direction = down - normal * np.dot(down, normal)
+            rim_direction /= max(1e-12, np.linalg.norm(rim_direction))
+            outlet = tcp + SCENE['ladle']['radius_m'] * rim_direction
+            if self.geometry.submerged(outlet, self.height):
+                # Immersed cup and pot communicate: do not emit an airborne jet
+                # or drain a filled immersed cup down to its dry-air retention.
+                pass
+            else:
+                self.ladle -= volume
+                self.packets.append({'p': outlet, 'velocity': np.array([0., 0., -.05]), 'v': volume})
         remaining = []
         for packet in self.packets:
             start = packet['p']
+            if self.geometry.submerged(start, self.height):
+                self.pot += packet['v']
+                continue
             end = start + packet['velocity'] * dt + np.array([0., 0., -.5 * 9.81 * dt**2])
             packet['velocity'][2] -= 9.81 * dt
             hit_chicken = self.geometry.segment_chicken(start, end)

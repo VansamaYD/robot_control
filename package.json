@@ -1,12 +1,13 @@
 {
   "name": "robot-control-workbench",
   "private": true,
-  "version": "0.13.0",
+  "version": "0.14.0",
   "type": "module",
   "scripts": {
     "test:browser": "node output/prototype/v11/verify_browser.cjs",
     "test:mcp": "node output/prototype/v11/verify_mcp.mjs",
-    "test:controls": "node output/prototype/v11/verify_controls.mjs"
+    "test:controls": "node output/prototype/v11/verify_controls.mjs",
+    "test:recovery": "node output/prototype/v11/verify_recovery.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

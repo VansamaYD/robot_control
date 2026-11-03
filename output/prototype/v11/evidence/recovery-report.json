@@ -1,0 +1,62 @@
+{
+  "status": "passed",
+  "tests": [
+    {
+      "name": "explicit_reset_restores_pose_liquid_time_but_keeps_programs",
+      "status": "passed",
+      "details": {
+        "incarnation": "boot-1db2d03619954b788a1978c21d920f8d"
+      }
+    },
+    {
+      "name": "long_hold_uses_live_jog_and_stops_on_release",
+      "status": "passed",
+      "details": {
+        "delta_deg": 2.3600000000000017,
+        "configured_simulation_speed": 8,
+        "jog_speed_deg_s": 4
+      }
+    },
+    {
+      "name": "blur_cancels_hold_without_a_followup_click",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "name": "no_heartbeat_expires_independently_of_page_and_speed",
+      "status": "passed",
+      "details": {
+        "lease_timeout_ms": 350
+      }
+    },
+    {
+      "name": "closing_held_page_does_not_leave_motion_running",
+      "status": "passed",
+      "details": {
+        "reason": "pagehide"
+      }
+    },
+    {
+      "name": "home_recovers_without_refilling_or_resetting",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "name": "loaded_ladle_parks_after_checked_return_to_pot",
+      "status": "passed",
+      "details": {
+        "tcp_m": [
+          -0.23999999998536276,
+          -0.29999999999467264,
+          0.1950004242796406
+        ],
+        "ladle_ml": 0.41746004900095224
+      }
+    },
+    {
+      "name": "operator_handoff_returns_from_park_to_ready_pick",
+      "status": "passed",
+      "details": {}
+    }
+  ]
+}
