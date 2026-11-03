@@ -28,6 +28,7 @@ from liquid import Liquid
 from scene_geometry import SCENE
 from projects import code_view
 from errors import MotionError
+import ik_solver
 from jog_control import JogMixin
 from presets import HOME_Q, DOCK, DRY_LIMIT_M3, recovery_candidates
 
@@ -122,6 +123,8 @@ class Engine(JogMixin):
         self.liquid = Liquid()
         self.rev = 0
         self.epoch = 0
+        self.planning_context = threading.local()
+        self.planning_timeout_s = 30.
         self.paused = True
         self.speed = 1
         self.status = 'ready'
@@ -432,7 +435,15 @@ class Engine(JogMixin):
             self.preset_requests[key] = (fingerprint, job_id)
             return job_id
 
+    def _planning_checkpoint(self):
+        context = self.planning_context
+        if getattr(context, 'epoch', self.epoch) != self.epoch:
+            raise MotionError('PLANNING_CANCELLED')
+        if time.perf_counter() > getattr(context, 'deadline', float('inf')):
+            raise MotionError('PLANNING_TIMEOUT', {'budget_s': self.planning_timeout_s})
+
     def plan(self, action, start):
+        self._planning_checkpoint()
         if np.asarray(start).shape != (5,) or not np.isfinite(start).all() or np.any(start < arm.LOW) or np.any(start > arm.HIGH):
             raise MotionError('INVALID_START_STATE')
         if clearance(start)[0] < 0:
@@ -446,6 +457,7 @@ class Engine(JogMixin):
             count = math.ceil(action['duration_s'] / DT)
             path, gap = [], float('inf')
             for index in range(1, count + 1):
+                self._planning_checkpoint()
                 u = index / count
                 q = start + (goal-start)*(10*u**3-15*u**4+6*u**5)
                 gap = min(gap, clearance(q)[0])
@@ -472,7 +484,9 @@ class Engine(JogMixin):
         result = []
         q = start.copy()
         minimum_gap = float('inf')
+        fallback_points = 0
         for index in range(1, count + 1):
+            self._planning_checkpoint()
             u = index / count
             u = 10*u**3 - 15*u**4 + 6*u**5
             p = p0 + (target - p0) * u
@@ -480,13 +494,25 @@ class Engine(JogMixin):
             if np.linalg.norm(n) < 1e-6:
                 raise MotionError('UNSUPPORTED_NORMAL_PATH')
             n /= np.linalg.norm(n)
-            q, pe, ne = arm.solve(p, n, BASE, seed=q, restarts=0)
-            if pe > .0002 or ne > .002:
-                raise MotionError('NO_IK')
-            gap = clearance(q)[0]
+            previous_q = q.copy()
+            q, pe, ne, diagnostics = ik_solver.solve(p, n, BASE, previous_q,
+                guard=self._planning_checkpoint, fallback=fallback_points < 8,
+                max_jump=np.deg2rad(60)*DT)
+            if diagnostics['attempts'] > 1:
+                fallback_points += 1
+            stats = getattr(self.planning_context, 'stats', None)
+            if stats is not None:
+                stats['ik_points'] += 1
+                stats['fallback_points'] += int(diagnostics['attempts'] > 1)
+                stats['ik_iterations'] += diagnostics['iterations']
+            if pe > .0002 or ne > .002 or diagnostics['joint_step_rad'] > np.deg2rad(60)*DT+1e-12:
+                raise MotionError('NO_IK', {**diagnostics, 'sample': index, 'samples': count,
+                    'progress': index/count, 'target_m': p.tolist(), 'normal': n.tolist()})
+            gap, obstacle, *_ = clearance(q)
             minimum_gap = min(gap, minimum_gap)
             if gap < 0:
-                raise MotionError('COLLISION')
+                raise MotionError('COLLISION', {'sample': index, 'samples': count,
+                    'clearance_m': gap, 'part': obstacle})
             result.append(q.copy())
         samples = np.array([start] + result)
         velocity = np.diff(samples, axis=0) / DT
@@ -497,13 +523,21 @@ class Engine(JogMixin):
 
     def _run(self, epoch, program=None):
         try:
+            self.planning_context.epoch = epoch
+            self.planning_context.stats = {'ik_points': 0, 'fallback_points': 0, 'ik_iterations': 0}
+            self.planning_context.deadline = time.perf_counter()+self.planning_timeout_s
             prepared = None
             if program and program.get('preset'):
                 planning_started = time.perf_counter()
                 with self.changed:
                     initial_q = self.q.copy()
                     initial_liquid = deepcopy(self.liquid)
-                failures = []
+                    initial_config = self.config
+                    initial_incarnation = self.incarnation
+                    self.job['planning_start'] = {'q_rad': initial_q.tolist(),
+                        'liquid': initial_liquid.snapshot(), 'configuration': initial_config,
+                        'incarnation': initial_incarnation}
+                failures, failure_details = [], []
                 for candidate_index, candidate in enumerate(program['candidates']):
                     try:
                         paths, q = [], initial_q.copy()
@@ -518,6 +552,7 @@ class Engine(JogMixin):
                                 self.publish()
                             path, gap = self.plan(item, q)
                             for sample in path:
+                                self._planning_checkpoint()
                                 p, n, *_ = arm.fk(sample, BASE)
                                 if item.get('requires_dry') and (not dry_verified or predicted.ladle > DRY_LIMIT_M3 or
                                         predicted.geometry.connected_volume(p, n, predicted.height) is not None):
@@ -535,13 +570,23 @@ class Engine(JogMixin):
                         program['actions'] = candidate
                         break
                     except MotionError as error:
+                        if str(error) in ('PLANNING_CANCELLED', 'PLANNING_TIMEOUT'):
+                            raise
                         failures.append(str(error))
+                        failure_details.append({'candidate': candidate_index+1, 'segment': segment_index+1,
+                            'name': item['name'], 'code': str(error), 'details': error.details})
+                        with self.changed:
+                            if epoch != self.epoch:
+                                return
+                            self.job['planning_failures'] = deepcopy(failure_details)
                 if prepared is None:
-                    raise MotionError('RECOVERY_PATH_UNAVAILABLE', {'candidates': failures})
+                    raise MotionError('RECOVERY_PATH_UNAVAILABLE', {'candidates': failures, 'failures': failure_details})
                 with self.changed:
                     if epoch != self.epoch:
                         return
-                    if not np.allclose(initial_q, self.q, atol=1e-12):
+                    if (not np.allclose(initial_q, self.q, atol=1e-12) or self.config != initial_config
+                            or self.incarnation != initial_incarnation
+                            or self.liquid.snapshot() != initial_liquid.snapshot()):
                         raise MotionError('START_STATE_CHANGED')
                     self.code_source = code_view(program['actions'])
                     self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
@@ -549,7 +594,8 @@ class Engine(JogMixin):
                                     planning_wall_s=time.perf_counter()-planning_started,
                                     planned_duration_s=sum(len(path)*DT for path, gap in prepared),
                                     predicted_spill_increment_m3=predicted.spill-initial_liquid.spill,
-                                    planned_samples=sum(len(path) for path, gap in prepared))
+                                    planned_samples=sum(len(path) for path, gap in prepared),
+                                    planning_stats=dict(self.planning_context.stats))
                     self.paused = not self.job['start_after_planning']
             actions = [{**a, 'source_line': index + 3} for index, a in enumerate(program['actions'])] if program else main(Robot())
             for index, action in enumerate(actions):
@@ -561,6 +607,8 @@ class Engine(JogMixin):
                     self.job['status'] = 'planning'
                     self.action = {**action, 'complete': False}
                     self.publish()
+                if prepared is None:
+                    self.planning_context.deadline = time.perf_counter()+self.planning_timeout_s
                 path, gap = prepared[index] if prepared is not None else self.plan(action, start)
                 with self.changed:
                     if epoch != self.epoch:

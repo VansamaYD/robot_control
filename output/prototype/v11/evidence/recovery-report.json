@@ -5,14 +5,14 @@
       "name": "explicit_reset_restores_pose_liquid_time_but_keeps_programs",
       "status": "passed",
       "details": {
-        "incarnation": "boot-0171e6703ee84bf8893dd63bc6c9d4db"
+        "incarnation": "boot-80c09d086349475babb4ed5b09d51f6f"
       }
     },
     {
       "name": "stationary_cup_naturally_fills_without_a_recipe",
       "status": "passed",
       "details": {
-        "filled_ml": 30.400000000000016
+        "filled_ml": 32.724923474893686
       }
     },
     {
@@ -53,11 +53,11 @@
       "status": "passed",
       "details": {
         "tcp_m": [
-          -0.23999999999335225,
-          -0.2999999999973763,
-          0.19500082489281495
+          -0.23999999999926824,
+          -0.300000000000166,
+          0.19500003101857308
         ],
-        "ladle_ml": 0.00071021916437806
+        "ladle_ml": 0.0007099116211581438
       }
     },
     {
@@ -69,9 +69,9 @@
       "name": "initially_empty_dock_still_drains_natural_inlet_before_exit",
       "status": "passed",
       "details": {
-        "planning_wall_s": 8.641669875010848,
+        "planning_wall_s": 6.02063954109326,
         "planned_duration_s": 55.300000000000004,
-        "remaining_ml": 0.00071021916437806
+        "remaining_ml": 0.0007099116211581438
       }
     }
   ]

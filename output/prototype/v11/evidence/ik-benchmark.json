@@ -1,0 +1,27 @@
+{
+  "scope": "offline canonical lift, identical collision samples; not a success-rate benchmark",
+  "results": [
+    {
+      "solver": "legacy",
+      "seconds": [
+        1.3313447500113398,
+        0.9944183749612421,
+        1.0010592499747872
+      ],
+      "samples": 610,
+      "gap_m": 0.007518464841711399,
+      "end_error_m": 4.209809523891649e-08
+    },
+    {
+      "solver": "analytic_adaptive",
+      "seconds": [
+        1.0137858749367297,
+        1.004653541953303,
+        0.966108417022042
+      ],
+      "samples": 610,
+      "gap_m": 0.007518464841711399,
+      "end_error_m": 5.275332172871809e-09
+    }
+  ]
+}

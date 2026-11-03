@@ -38,7 +38,11 @@ def recovery_candidates(mode, current_tcp, current_normal, ladle_m3, current_q=N
                 move('移至锅内排汁上方', LIFT, 8.)]
     alternate = [move('原位置抬升', upper, 10., current_normal), move('在高位回正汤勺', upper, 8.),
                  move('移至锅内排汁上方', LIFT, 8.)]
-    prefixes = [approach, alternate]
+    # Coupled translation/rotation: alternatives to forcing an in-place turn.
+    # Bounded candidates only; all still pass full collision/fluid rollout.
+    coupled = [[move('移向锅内同时回正汤勺', [0, -.100, z], 12.2),
+                move('回到排汁上方', LIFT, 8.)] for z in (.175, .205)]
+    prefixes = [approach, alternate] + coupled
     if np.linalg.norm(np.asarray(current_tcp)-DOCK) < .04:
         prefixes.insert(0, [move('抬离停靠位置', ABOVE, 4.), move('经锅外中转', GATE, 8.), move('移至锅内排汁上方', LIFT, 8.)])
     suffix = [move('下降至干燥的锅内排汁点', [0, -.100, .160], 4.),

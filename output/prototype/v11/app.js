@@ -248,7 +248,7 @@ try {
     $('readiness').textContent = state.scoop_readiness?.ready ? '取汁几何就绪；进液由液面接触决定。暂停时不演化，可点击“继续仿真”。' : '取汁前检查：' + describeReason(state.scoop_readiness);
     const progress = state.job?.planning_progress;
     $('planning-info').textContent = state.job?.preplanning && progress ?
-      `完整预检：候选 ${progress.candidate}，第 ${progress.segment}/${progress.segments} 段 ${progress.name}（已用≥${progress.elapsed_s.toFixed(1)}s）` :
+      `完整预检：候选 ${progress.candidate}，第 ${progress.segment}/${progress.segments} 段 ${progress.name}（已用≥${progress.elapsed_s.toFixed(1)}s，已拒绝 ${state.job.planning_failures?.length ?? 0} 条）` :
       state.job?.planning_wall_s !== undefined ? `计算 ${state.job.planning_wall_s.toFixed(2)}s · 动作 ${state.job.planned_duration_s.toFixed(1)}s · ${state.speed}×预览约 ${(state.job.planned_duration_s/state.speed).toFixed(1)}s` : '';
     window.__frameState = { ...state, rendered_tcp_m: position.toArray(), tcp_error_m: error,
       maximum_link_matrix_error: Math.max(...linkErrors), visual_mesh_count: visualCount,
@@ -291,7 +291,14 @@ try {
   }
   function describeError(code, details) {
     if (['LIQUID_UNAVAILABLE', 'SCOOP_PRECONDITION_FAILED'].includes(code)) return `${describeReason(details)}。可“回取汁位”保留汤汁恢复，或“重置仿真”。`;
-    const messages = { RECOVERY_PATH_UNAVAILABLE: details?.candidates?.includes('PREDICTED_SPILL') ? '预演发现途中会洒漏，未开始运动。需在锅内处理余汁或重置。' : '没有找到通过检查的恢复路线；未移动。可重置仿真。', DRAIN_INCOMPLETE: '排汁未达近空条件，禁止离锅', DOCK_DRY_INTERLOCK: '近空条件失效，已停止，禁止离锅', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
+    if (code === 'RECOVERY_PATH_UNAVAILABLE' && details?.failures?.length) {
+      const failure = details.failures.at(-1);
+      const reason = { NO_IK: '位置或勺口方向未找到连续关节解', COLLISION: '路径可能碰撞',
+        LIMIT_VIOLATION: '关节速度、加速度或限位超限', PREDICTED_SPILL: '预测洒漏',
+        DRAIN_INCOMPLETE: '排汁未达近空条件', DOCK_DRY_INTERLOCK: '离锅近空检查未通过' }[failure.code] ?? failure.code;
+      return `已检查 ${details.failures.length} 条候选路线，均未通过；未移动。最后失败：${failure.name}，${reason}。可调整姿态后重试或尝试回取汁位。`;
+    }
+    const messages = { PLANNING_TIMEOUT: '规划超过时间预算；未获准执行。可调整姿态后重试。', RECOVERY_PATH_UNAVAILABLE: details?.candidates?.includes('PREDICTED_SPILL') ? '预演发现途中会洒漏，未开始运动。需在锅内处理余汁或重置。' : '没有找到通过检查的恢复路线；未移动。可重置仿真。', DRAIN_INCOMPLETE: '排汁未达近空条件，禁止离锅', DOCK_DRY_INTERLOCK: '近空条件失效，已停止，禁止离锅', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
     return messages[code] ?? code;
   }
   function finiteStep(name, delta) {

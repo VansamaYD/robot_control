@@ -1,29 +1,29 @@
 {
   "session_id": "local-v11",
-  "incarnation": "boot-964139328985958",
-  "state_revision": 12315,
-  "tick": 12235,
-  "simulation_time_s": 244.7,
+  "incarnation": "boot-972236033350833",
+  "state_revision": 6137,
+  "tick": 6098,
+  "simulation_time_s": 121.96,
   "configuration_revision": "S_BASE-geometry-2",
   "source": "simulation",
   "q_rad": [
-    -0.0006737953337420731,
-    0.12171790856767212,
-    1.1198308276478461,
-    -1.5326631475543064,
-    0.8250046048630946
+    -0.0006737953333745914,
+    0.39678228129192866,
+    1.1358877078984861,
+    -1.5326634817793143,
+    0.0486821535760155
   ],
   "liquid": {
     "mode": "uncalibrated_volume_approximation",
-    "height_m": 0.07994297175059362,
+    "height_m": 0.07942527610186882,
     "capacity_m3": 0.00003272492347489368,
-    "pot_m3": 0.002120731549961116,
-    "ladle_m3": 0.000003256952267257668,
+    "pot_m3": 0.0020912635787534743,
+    "ladle_m3": 0.00003272492347489368,
     "air_m3": 0,
-    "surface_m3": 4.252914972570686e-20,
+    "surface_m3": 3.404237518749943e-19,
     "spill_m3": 0,
     "initial_m3": 0.0021239885022284865,
-    "balance_error_m3": -1.1275702593849246e-16,
+    "balance_error_m3": -1.1796119636642288e-16,
     "exchange_m3_s": 0,
     "packets": []
   },
@@ -47,5 +47,5 @@
   },
   "width": 1280,
   "height": 720,
-  "image_sha256": "c3a3f4c0bdd1a34931965f267a8424c04083d10a6ccf7a20a246901ed0f6e02f"
+  "image_sha256": "f6a0a282168f4416ce604a5746de43f9bd4b72bd7e9b6b00fc57426aa1675972"
 }
