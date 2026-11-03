@@ -85,7 +85,8 @@ async function until(fn, timeout = 120000) { const start = Date.now(); while (Da
     assert(report.samples.some(s => s.ladle_m3 > 25e-6));
     assert(report.samples.some(s => s.air_m3 > 0 || s.surface_m3 > 0));
     assert(report.samples.every(s => Math.abs(s.balance_error_m3) < 1e-10));
-    assert(finished.liquid.ladle_m3 < 1e-6);
+    // The recipe ends immersed at PICK: natural filling resumes on descent.
+    assert(finished.liquid.ladle_m3 > 25e-6);
     fs.writeFileSync(path.join(evidence, 'events.json'), JSON.stringify(events, null, 2));
     return { tick: finished.tick, action_tick: finished.action_tick, action_time_s: finished.action_tick * .02, simulation_time_s: finished.simulation_time_s, sampled_frames: report.samples.length, code_hash: hash };
   });

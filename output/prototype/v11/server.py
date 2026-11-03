@@ -54,9 +54,10 @@ def serve(port):
                                        'model': engine.model, 'scene': SCENE, 'default_program': default,
                                        'projects': store.list(), 'dt_s': .02})
                 if path.path == '/api/capabilities':
-                    return self.reply({'version': '0.14.0', 'mode': 'simulation', 'mcp_stdio': True,
+                    return self.reply({'version': '0.15.0', 'mode': 'simulation', 'mcp_stdio': True,
                                        'render_snapshot': True, 'manual_joint_steps': True,
                                        'leased_jog': True, 'recovery_presets': True,
+                                       'natural_liquid_exchange': True, 'dock_dry_interlock': True,
                                        'arbitrary_python': False, 'hardware': False, 'vision': False})
                 if path.path == '/api/projects':
                     return self.reply(store.list())
@@ -124,7 +125,7 @@ def serve(port):
                     key = data.get('idempotency_key')
                     if not isinstance(key, str) or not 0 < len(key) <= 200:
                         raise MotionError('INVALID_ARGUMENT')
-                    return self.reply({'job_id': engine.manual(data.get('joint_name'), data.get('delta_deg'), key, data.get('expected_state_revision'))})
+                    return self.reply({'job_id': engine.manual(data.get('joint_name'), data.get('delta_deg'), key, data.get('expected_state_revision'), data.get('incarnation'))})
                 if self.path in ('/api/jog/start', '/api/jog/heartbeat', '/api/jog/stop', '/api/preset', '/api/reset'):
                     if client['principal'] != 'ui':
                         raise MotionError('NOT_AUTHORIZED')

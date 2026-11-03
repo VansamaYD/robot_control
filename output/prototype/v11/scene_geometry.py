@@ -16,6 +16,8 @@ SCENE = {
     'liquid_model': 'uncalibrated volume ledger / ballistic packets / exponential return',
 }
 
+INTEGRATION_NODES, INTEGRATION_WEIGHTS = np.polynomial.legendre.leggauss(32)
+
 
 class Geometry:
     def __init__(self):
@@ -99,3 +101,35 @@ class Geometry:
         return (0 <= point[2] <= height and
                 math.hypot(point[0], point[1]) <= self.pot_radius(point[2]) and
                 not self.inside_chicken(point))
+
+    def rim_lowest(self, tcp, normal):
+        normal = np.asarray(normal, dtype=float)
+        normal = normal/max(1e-12, np.linalg.norm(normal))
+        down = np.array([0., 0., -1.])
+        tangent = down-normal*np.dot(down, normal)
+        return np.asarray(tcp)+SCENE['ladle']['radius_m']*tangent/max(1e-12, np.linalg.norm(tangent))
+
+    def connected_volume(self, tcp, normal, height):
+        """Communicating fluid volume, or None if the mouth is dry/unsupported.
+
+        Integrates a sphere intersected with its bowl half-space and the world
+        horizontal water plane. Inverted trapped-air behavior is not modeled.
+        """
+        normal = np.asarray(normal, dtype=float)
+        normal = normal/max(1e-12, np.linalg.norm(normal))
+        if normal[2] < -1e-8 or not self.submerged(self.rim_lowest(tcp, normal), height):
+            return None
+        r = SCENE['ladle']['radius_m']; level = height-tcp[2]
+        horizontal = float(np.linalg.norm(normal[:2]))
+        if level >= r*horizontal:
+            return SCENE['ladle']['capacity_m3']
+        if horizontal < 1e-10:
+            return None
+        upper = min(r, level)
+        if upper <= -r:
+            return 0.
+        z = (upper+r)/2*INTEGRATION_NODES+(upper-r)/2
+        radius = np.sqrt(np.maximum(0., r*r-z*z))
+        cut = np.clip(-normal[2]*z/horizontal, -radius, radius)
+        area = radius*radius*(np.arcsin(np.clip(cut/np.maximum(radius, 1e-15), -1, 1))+np.pi/2)+cut*np.sqrt(np.maximum(0., radius*radius-cut*cut))
+        return min(SCENE['ladle']['capacity_m3'], max(0., float(np.dot(INTEGRATION_WEIGHTS, area))*(upper+r)/2))

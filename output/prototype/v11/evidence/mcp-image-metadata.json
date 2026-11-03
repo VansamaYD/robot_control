@@ -1,29 +1,30 @@
 {
   "session_id": "local-v11",
-  "incarnation": "boot-958572916442333",
-  "state_revision": 7441,
-  "tick": 7402,
-  "simulation_time_s": 148.04,
+  "incarnation": "boot-964139328985958",
+  "state_revision": 12315,
+  "tick": 12235,
+  "simulation_time_s": 244.7,
   "configuration_revision": "S_BASE-geometry-2",
   "source": "simulation",
   "q_rad": [
-    -0.0006737953337420641,
-    0.39678179868198027,
-    1.1358878567661936,
+    -0.0006737953337420731,
+    0.12171790856767212,
+    1.1198308276478461,
     -1.5326631475543064,
-    0.048682153576007386
+    0.8250046048630946
   ],
   "liquid": {
     "mode": "uncalibrated_volume_approximation",
-    "height_m": 0.07947340299892643,
+    "height_m": 0.07994297175059362,
     "capacity_m3": 0.00003272492347489368,
-    "pot_m3": 0.0020939885022284704,
-    "ladle_m3": 0.000029999999999999997,
+    "pot_m3": 0.002120731549961116,
+    "ladle_m3": 0.000003256952267257668,
     "air_m3": 0,
-    "surface_m3": 9.234534960654911e-23,
+    "surface_m3": 4.252914972570686e-20,
     "spill_m3": 0,
     "initial_m3": 0.0021239885022284865,
-    "balance_error_m3": -1.6046192152785466e-17,
+    "balance_error_m3": -1.1275702593849246e-16,
+    "exchange_m3_s": 0,
     "packets": []
   },
   "camera": {
@@ -46,5 +47,5 @@
   },
   "width": 1280,
   "height": 720,
-  "image_sha256": "ced314de3ddce1ffa628a587a8ad5485cb1f405091c582d7720ff0b70d217673"
+  "image_sha256": "c3a3f4c0bdd1a34931965f267a8424c04083d10a6ccf7a20a246901ed0f6e02f"
 }

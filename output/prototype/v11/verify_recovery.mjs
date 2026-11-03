@@ -42,6 +42,14 @@ try {
     assert.equal((await(await fetch(base+'/api/projects')).json()).length,programs);
     return {incarnation:result.incarnation};
   });
+  await check('stationary_cup_naturally_fills_without_a_recipe',async()=>{
+    const initial=await state();assert.equal(initial.liquid.ladle_m3,0);
+    await page.click('#resume');
+    const filled=await waitFor(async()=>{const s=await state();return s.liquid.ladle_m3>25e-6?s:null;});
+    await page.click('#pause');await page.waitForFunction(()=>window.__frameState.paused);
+    assert.deepEqual(filled.q_rad,initial.q_rad);assert.equal(filled.job,null);
+    await reset();return {filled_ml:filled.liquid.ladle_m3*1e6};
+  });
   await page.selectOption('#speed','8');
   await check('long_hold_uses_live_jog_and_stops_on_release',async()=>{
     const initial=await state();await held(page);await sleep(650);await page.mouse.up();
@@ -70,12 +78,13 @@ try {
     await held(lost);await lost.close();await sleep(650);const stopped=await state();assert(!stopped.jog.active);
     await sleep(200);assert.deepEqual((await state()).q_rad,stopped.q_rad);return {reason:stopped.job.end_reason};
   });
-  await check('home_recovers_without_refilling_or_resetting',async()=>{
+  await check('home_preserves_total_with_natural_exchange',async()=>{
     const before=await state();
     await page.click('#home');
     const complete=await waitFor(async()=>{const s=await state();if(s.status==='failed')throw Error(JSON.stringify(s.job));return s.job?.preset==='home'&&s.status==='succeeded'?s:null;});
     assert.equal(complete.incarnation,before.incarnation);assert(complete.scoop_readiness.ready);
-    assert(Math.abs(complete.liquid.pot_m3-before.liquid.pot_m3)<1e-10);
+    const sum=s=>['pot_m3','ladle_m3','air_m3','surface_m3','spill_m3'].reduce((v,key)=>v+s.liquid[key],0);
+    assert(Math.abs(sum(complete)-sum(before))<1e-10);
     assert.equal(complete.liquid.initial_m3,before.liquid.initial_m3);return {};
   });
   const scoop=await post('/api/projects',{name:'恢复测试取汁',actions:[{kind:'scoop',name:'取汁30mL',target_m3:30e-6,duration_s:.7}]});
@@ -87,7 +96,8 @@ try {
     await page.waitForFunction(()=>window.__frameState.job?.preplanning===true);
     const planning=await state();await sleep(300);assert.deepEqual((await state()).q_rad,planning.q_rad);assert.equal((await state()).tick,planning.tick);
     const parked=await waitFor(async()=>{const s=await state();if(s.status==='failed')throw Error(JSON.stringify(s.job));return s.status==='waiting_operator'?s:null;});
-    assert(parked.parking.virtual_parked);assert(!parked.parking.support_contact_validated);assert(parked.liquid.ladle_m3<.5e-6);
+    assert(parked.parking.virtual_parked);assert(!parked.parking.support_contact_validated);assert(parked.liquid.ladle_m3<1e-9);
+    assert(parked.job.dry_verified);assert(parked.job.dry_check.ladle_m3<1e-9);assert(parked.job.dry_check.air_m3<1e-9);
     assert.equal(parked.incarnation,before.incarnation);
     assert(Math.abs(parked.liquid.balance_error_m3)<1e-10);
     await page.waitForFunction(()=>window.__frameState.status==='waiting_operator');
@@ -102,6 +112,14 @@ try {
     assert(returned.scoop_readiness.ready);return {};
   });
   await reset();
+  await check('initially_empty_dock_still_drains_natural_inlet_before_exit',async()=>{
+    const empty=await state();assert.equal(empty.liquid.ladle_m3,0);
+    await page.click('#dock');
+    const parked=await waitFor(async()=>{const s=await state();if(s.status==='failed')throw Error(JSON.stringify(s.job));return s.status==='waiting_operator'?s:null;});
+    assert(parked.job.dry_verified);assert(parked.liquid.ladle_m3<1e-9);assert.equal(parked.liquid.spill_m3,0);
+    assert(parked.job.planning_wall_s>=0);assert(parked.job.planned_duration_s>0);
+    await reset();return {planning_wall_s:parked.job.planning_wall_s,planned_duration_s:parked.job.planned_duration_s,remaining_ml:parked.liquid.ladle_m3*1e6};
+  });
   assert.equal(pageErrors.length,0);report.status='passed';
 }catch(error){report.status='failed';report.error=error.stack;console.error(error);process.exitCode=1;}
 finally{if(browser)await browser.close();fs.writeFileSync(path.join(root,'evidence/recovery-report.json'),JSON.stringify(report,null,2));}

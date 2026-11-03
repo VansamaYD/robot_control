@@ -5,3 +5,5 @@
 #joints{font-size:10px}#joints td:first-child{max-width:104px;overflow:hidden;text-overflow:ellipsis}#joints td:not(:first-child){text-align:right}#joints button{padding:3px 6px;margin-left:3px;font-size:12px}#snapshot-preview{width:100%;border:1px solid #354250;border-radius:5px}#snapshot-download{display:block;font-size:12px;color:#85e0ca;margin:8px 0}#snapshot-download[hidden]{display:none}
 
 #readiness{font-size:11px;color:#b2c4d0;line-height:1.6;margin-bottom:18px}dialog{max-width:480px;border:1px solid #456078;border-radius:8px;background:#172331;color:#deebf3;padding:24px}dialog::backdrop{background:#0009}dialog h2{font-size:18px}dialog p{font-size:13px;line-height:1.8}#joints button{touch-action:none;user-select:none}.recovery{border-top:1px solid #2b3947;padding-top:12px}
+
+#planning-info{font-size:11px;color:#94baa8;line-height:1.6;margin:0 0 16px}

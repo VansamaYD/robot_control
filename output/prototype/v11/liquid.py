@@ -14,6 +14,7 @@ class Liquid:
         self.spill = 0.
         self.packets = []
         self.capacity = SCENE['ladle']['capacity_m3']
+        self.exchange_rate = 0.
 
     @property
     def height(self):
@@ -30,8 +31,8 @@ class Liquid:
             reason = 'EMPTY_POT'
         elif angle > math.degrees(math.acos(.95)):
             reason = 'LADLE_TILTED'
-        elif tcp[2] - SCENE['ladle']['radius_m'] >= self.height:
-            reason = 'ABOVE_LIQUID'
+        elif self.geometry.connected_volume(tcp, normal, self.height) is None:
+            reason = 'MOUTH_ABOVE_LIQUID'
         elif available <= 1e-12:
             reason = 'SCOOP_REGION_BLOCKED'
         elif available + 1e-9 < target:
@@ -55,21 +56,22 @@ class Liquid:
         if not math.isfinite(dt) or not 0 < dt <= .1:
             raise ValueError('INVALID_LIQUID_TIMESTEP')
         tcp, normal = np.asarray(tcp), np.asarray(normal)
-        if scoop_target is not None:
-            allowed = self.geometry.scoop_capacity(tcp, normal, self.height)
-            amount = max(0., min(scoop_target, allowed, self.capacity) - self.ladle)
-            amount = min(amount, self.pot, 80e-6 * dt)
-            self.pot -= amount
-            self.ladle += amount
+        # Geometry, not a recipe flag, determines water entry and equalization.
+        # scoop_target is retained for SDK compatibility; the action only waits
+        # for/validates a minimum volume, and cannot inject liquid.
+        connected = self.geometry.connected_volume(tcp, normal, self.height)
+        self.exchange_rate = 0.
+        if connected is not None:
+            amount = float(np.clip(connected-self.ladle, -80e-6*dt, 80e-6*dt))
+            amount = min(amount, self.pot)
+            self.pot -= amount; self.ladle += amount
+            self.exchange_rate = amount/dt
         angle = math.acos(float(np.clip(normal[2], -1, 1)))
         excess = max(0., self.ladle - self.retained_capacity(normal))
         if excess > 0:
             flow = 80e-6 * math.sin(min(math.pi/2, angle)) * math.sqrt(excess/self.capacity)
             volume = min(excess, flow * dt)
-            down = np.array([0., 0., -1.])
-            rim_direction = down - normal * np.dot(down, normal)
-            rim_direction /= max(1e-12, np.linalg.norm(rim_direction))
-            outlet = tcp + SCENE['ladle']['radius_m'] * rim_direction
+            outlet = self.geometry.rim_lowest(tcp, normal)
             if self.geometry.submerged(outlet, self.height):
                 # Immersed cup and pot communicate: do not emit an airborne jet
                 # or drain a filled immersed cup down to its dry-air retention.
@@ -119,4 +121,5 @@ class Liquid:
                 'air_m3': sum(p['v'] for p in self.packets), 'surface_m3': self.surface,
                 'spill_m3': self.spill, 'initial_m3': self.initial,
                 'balance_error_m3': self.total() - self.initial,
+                'exchange_m3_s': self.exchange_rate,
                 'packets': [{'position_m': p['p'].tolist(), 'volume_m3': p['v']} for p in self.packets]}

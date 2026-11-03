@@ -203,10 +203,10 @@ try {
     drops.instanceMatrix.needsUpdate = true;
     $('liquid-ledger').replaceChildren(...[
       ['锅内', liquid.pot_m3], ['勺内', liquid.ladle_m3], ['空中 / 表面', liquid.air_m3 + liquid.surface_m3],
-      ['洒漏', liquid.spill_m3], ['收支偏差', liquid.balance_error_m3]
-    ].map(([label, amount]) => {
+      ['洒漏', liquid.spill_m3], ['收支偏差', liquid.balance_error_m3], ['自然交换', liquid.exchange_m3_s ?? 0, 'mL/s']
+    ].map(([label, amount, unit = 'mL']) => {
       const row = document.createElement('div'), title = document.createElement('span'), value = document.createElement('b');
-      title.textContent = label; value.textContent = (amount * 1e6).toFixed(3) + ' mL'; row.append(title, value); return row;
+      title.textContent = label; value.textContent = label === '自然交换' && state.paused ? '暂停' : (amount * 1e6).toFixed(3) + ' ' + unit; row.append(title, value); return row;
     }));
     if (current && current.incarnation !== state.incarnation) {
       history.length = 0;
@@ -217,11 +217,12 @@ try {
       trajectory.geometry.dispose(); trajectory.geometry = new THREE.BufferGeometry().setFromPoints(history);
     }
     current = state;
-    $('status').textContent = state.job?.preplanning ? '检查完整路线 · 时钟暂停' : state.paused && ['planning', 'running'].includes(state.job?.status) ? '已暂停' : labels[state.status] ?? state.status;
+    const activeMotionJob = ['planning', 'running'].includes(state.job?.status);
+    $('status').textContent = state.job?.preplanning ? '检查完整路线 · 时钟暂停' : !state.paused && !activeMotionJob ? '自然流动 · 机械臂保持' : state.paused && activeMotionJob ? '已暂停' : labels[state.status] ?? state.status;
     $('connection').textContent = `${visualCount} 个网格 · ${state.job?.origin === 'mcp' ? 'MCP任务' : ['manual', 'jog'].includes(state.job?.origin) ? '手动任务' : '本地流程'} · 服务在线`;
     $('frame').textContent = `快照 #${state.state_revision} · tick ${state.tick}`;
     $('time').textContent = `${state.simulation_time_s.toFixed(2)} s`;
-    $('action').textContent = state.status === 'waiting_operator' ? '模拟停靠完成；操作后点击“回取汁位”' : state.action?.name ?? '待机 · 初始暂停';
+    $('action').textContent = state.status === 'waiting_operator' ? '模拟停靠完成；操作后点击“回取汁位”' : !state.paused && !activeMotionJob ? '机械臂保持，液体按几何自然进出与回流' : state.action?.name ?? '待机 · 初始暂停';
     $('hash').textContent = state.code_hash.slice(0, 12);
     $('tcp').textContent = state.tcp_m.map(value => (value * 1000).toFixed(1)).join(', ');
     state.joint_names.forEach((name, i) => {
@@ -236,15 +237,19 @@ try {
     const busy = ['planning', 'running', 'waiting_operator'].includes(state.job?.status);
     jointRows.forEach(row => row.buttons.forEach(button => { button.disabled = busy && state.job?.origin !== 'jog'; }));
     $('run').disabled = busy;
-    $('pause').disabled = !busy || state.paused;
-    $('resume').disabled = !busy || !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
-    $('step').disabled = !busy || !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
+    $('pause').disabled = state.paused || state.job?.preplanning || state.status === 'waiting_operator';
+    $('resume').disabled = !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
+    $('step').disabled = !state.paused || state.job?.preplanning || state.status === 'waiting_operator';
     $('cancel').disabled = !busy;
     $('home').disabled = busy && state.status !== 'waiting_operator';
     $('dock').disabled = busy;
     for (const id of ['project', 'edit', 'save', 'import']) $(id).disabled = busy;
     $('error').textContent = state.job?.error ? describeError(state.job.error, state.job.error_details) : lastCommandError ?? '';
-    $('readiness').textContent = state.scoop_readiness?.ready ? '取汁前检查：位置与姿态可用' : '取汁前检查：' + describeReason(state.scoop_readiness);
+    $('readiness').textContent = state.scoop_readiness?.ready ? '取汁几何就绪；进液由液面接触决定。暂停时不演化，可点击“继续仿真”。' : '取汁前检查：' + describeReason(state.scoop_readiness);
+    const progress = state.job?.planning_progress;
+    $('planning-info').textContent = state.job?.preplanning && progress ?
+      `完整预检：候选 ${progress.candidate}，第 ${progress.segment}/${progress.segments} 段 ${progress.name}（已用≥${progress.elapsed_s.toFixed(1)}s）` :
+      state.job?.planning_wall_s !== undefined ? `计算 ${state.job.planning_wall_s.toFixed(2)}s · 动作 ${state.job.planned_duration_s.toFixed(1)}s · ${state.speed}×预览约 ${(state.job.planned_duration_s/state.speed).toFixed(1)}s` : '';
     window.__frameState = { ...state, rendered_tcp_m: position.toArray(), tcp_error_m: error,
       maximum_link_matrix_error: Math.max(...linkErrors), visual_mesh_count: visualCount,
       camera: { position: camera.position.toArray(), target: controls.target.toArray(), up: camera.up.toArray(), fov: camera.fov } };
@@ -280,17 +285,17 @@ try {
   function describeReason(details) {
     if (!details) return '等待状态';
     const messages = { READY: '未取足目标量，请检查取汁时长', LADLE_TILTED: `勺口倾斜 ${details.tilt_deg?.toFixed(1)}°，请先回取汁位`,
-      EMPTY_POT: '锅中无可用汤汁', ABOVE_LIQUID: '勺子未浸入汤汁', SCOOP_REGION_BLOCKED: '取汁位置受锅壁或鸡肉限制，请回取汁位',
+      EMPTY_POT: '锅中无可用汤汁', ABOVE_LIQUID: '勺子未浸入汤汁', MOUTH_ABOVE_LIQUID: '勺身可能入水，但勺口尚未接通液面', SCOOP_REGION_BLOCKED: '取汁位置受锅壁或鸡肉限制，请回取汁位',
       INSUFFICIENT_SUBMERSION: '浸入深度不足', INSUFFICIENT_POT_VOLUME: '锅中有效汁量不足' };
     return messages[details.reason] ?? details.reason;
   }
   function describeError(code, details) {
     if (['LIQUID_UNAVAILABLE', 'SCOOP_PRECONDITION_FAILED'].includes(code)) return `${describeReason(details)}。可“回取汁位”保留汤汁恢复，或“重置仿真”。`;
-    const messages = { RECOVERY_PATH_UNAVAILABLE: '没有找到通过检查的恢复路线；未移动。可重置仿真。', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
+    const messages = { RECOVERY_PATH_UNAVAILABLE: details?.candidates?.includes('PREDICTED_SPILL') ? '预演发现途中会洒漏，未开始运动。需在锅内处理余汁或重置。' : '没有找到通过检查的恢复路线；未移动。可重置仿真。', DRAIN_INCOMPLETE: '排汁未达近空条件，禁止离锅', DOCK_DRY_INTERLOCK: '近空条件失效，已停止，禁止离锅', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
     return messages[code] ?? code;
   }
   function finiteStep(name, delta) {
-    act(() => post('/api/manual', { joint_name: name, delta_deg: delta, expected_state_revision: current.state_revision, idempotency_key: crypto.randomUUID() }))();
+    act(() => post('/api/manual', { joint_name: name, delta_deg: delta, expected_state_revision: current.state_revision, incarnation: current.incarnation, idempotency_key: crypto.randomUUID() }))();
   }
   function beginHold(event, button, name, direction) {
     if (event.button !== 0 || hold) return;
@@ -410,7 +415,11 @@ try {
     } finally { $('snapshot').disabled = false; }
   });
   for (const [id, command] of [['pause', 'pause'], ['resume', 'resume'], ['step', 'step_tick'], ['cancel', 'cancel']]) {
-    $(id).onclick = act(() => post('/api/control', { command, job_id: current.job?.job_id }));
+    $(id).onclick = act(() => {
+      const active = ['planning', 'running', 'waiting_operator'].includes(current.job?.status);
+      const actual = !active && ['pause', 'resume'].includes(command) ? command + '_world' : command;
+      return post('/api/control', { command: actual, job_id: active ? current.job?.job_id : undefined });
+    });
   }
   $('speed').onchange = act(() => post('/api/speed', { speed: Number($('speed').value) }));
   function resize() {

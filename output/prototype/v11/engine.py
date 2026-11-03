@@ -21,14 +21,15 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / 'v03'))
 import arm_model as arm
-from trajectory_sim import clearance, BASE, CONFIG as LEGACY_CONFIG
+from trajectory_sim import BASE, CONFIG as LEGACY_CONFIG
+from collision_model import clearance
 from flow import main
 from liquid import Liquid
 from scene_geometry import SCENE
 from projects import code_view
 from errors import MotionError
 from jog_control import JogMixin
-from presets import HOME_Q, DOCK, recovery_candidates
+from presets import HOME_Q, DOCK, DRY_LIMIT_M3, recovery_candidates
 
 DT = .02
 NAMES = [entry[0] for entry in arm.JOINTS]
@@ -161,6 +162,7 @@ class Engine(JogMixin):
                  'liquid': self.liquid.snapshot()}
         frame['scoop_readiness'] = self.liquid.scoop_diagnostics(p, n, 30e-6)
         frame['jog'] = {'active': self.jog is not None, 'speed_deg_s': 4, 'lease_timeout_ms': 350}
+        frame['world_phase'] = 'paused' if self.paused else 'motion' if self.queue or self.jog else 'fluid_only'
         frame['parking'] = {'target_m': DOCK, 'virtual_parked': bool(np.linalg.norm(p-DOCK) < .001),
                             'support_contact_validated': False}
         self.frames[self.rev] = frame
@@ -194,7 +196,7 @@ class Engine(JogMixin):
             now = time.monotonic()
             with self.lock:
                 self.expire_jog(now)
-                if not self.paused and (self.queue or (self.job and self.job['status'] in ('planning', 'running'))):
+                if not self.paused:
                     accumulator += min(now - previous, .1) * (1 if self.jog else self.speed)
                     while accumulator >= DT:
                         self.advance()
@@ -207,9 +209,15 @@ class Engine(JogMixin):
         with self.changed:
             if self.paused and not single:
                 return False
-            if not self.queue and not (self.job and self.job['status'] in ('planning', 'running')):
+            if self.job and self.job.get('preplanning'):
                 return False
             moving = bool(self.queue)
+            if moving and self.action.get('requires_dry'):
+                candidate_p, candidate_n, *_ = arm.fk(self.queue[0], BASE)
+                if (not self.job.get('dry_verified') or self.liquid.ladle > DRY_LIMIT_M3 or
+                        self.liquid.geometry.connected_volume(candidate_p, candidate_n, self.liquid.height) is not None):
+                    self._fail_action('DOCK_DRY_INTERLOCK', {'ladle_m3': self.liquid.ladle})
+                    return False
             previous_q = self.q.copy()
             jogging = self.jog is not None
             if jogging:
@@ -225,19 +233,35 @@ class Engine(JogMixin):
             self.liquid.advance(DT, p, n, target)
             if moving and not self.queue:
                 self.action['complete'] = True
-                if self.action.get('kind') == 'scoop' and self.liquid.ladle < self.action['target_m3'] - 1e-9:
-                    self.epoch += 1
-                    self.status = 'failed'
-                    self.job.update(status='failed', error='LIQUID_UNAVAILABLE',
-                                    error_details=self.liquid.scoop_diagnostics(p, n, self.action['target_m3']))
-                    self.paused = True
-                    self.event('job_failed', error='LIQUID_UNAVAILABLE')
-                    self.event('action_failed', name=self.action['name'], error='LIQUID_UNAVAILABLE')
+                if self.action.get('kind') == 'verify_dry':
+                    air = sum(packet['v'] for packet in self.liquid.packets)
+                    if self.liquid.ladle > DRY_LIMIT_M3 or air > DRY_LIMIT_M3:
+                        self._fail_action('DRAIN_INCOMPLETE', {'ladle_m3': self.liquid.ladle, 'air_m3': air})
+                        return False
+                    self.job['dry_verified'] = True
+                    self.job['dry_check'] = {'tick': self.tick, 'tcp_m': p.tolist(), 'ladle_m3': self.liquid.ladle, 'air_m3': air}
+                    self.event('drain_verified', **self.job['dry_check'])
+                    self.event('action_completed', name=self.action['name'])
+                elif self.action.get('kind') == 'scoop' and self.liquid.ladle < self.action['target_m3'] - 1e-9:
+                    self._fail_action('LIQUID_UNAVAILABLE', self.liquid.scoop_diagnostics(p, n, self.action['target_m3']))
+                    return False
                 else:
                     self.event('action_completed', name=self.action['name'])
             self.publish()
             self.changed.notify_all()
             return True
+
+    def _fail_action(self, code, details=None):
+        self.epoch += 1
+        self.queue.clear()
+        self.status = 'failed'
+        self.job.update(status='failed', error=code, error_details=details, preplanning=False)
+        self.paused = True
+        self.velocity[:] = 0
+        self.target_q = self.q.copy()
+        self.event('action_failed', name=self.action['name'] if self.action else None, error=code)
+        self.publish()
+        self.changed.notify_all()
 
     def control(self, command, job_id=None, principal='ui'):
         with self.changed:
@@ -253,7 +277,12 @@ class Engine(JogMixin):
             if self.jog and command in ('pause', 'cancel'):
                 self._finish_jog('operator_' + command)
                 return self.snapshot()
-            if command == 'pause':
+            if command in ('pause_world', 'resume_world'):
+                if principal != 'ui' or self.job and self.job['status'] in ('planning', 'running', 'waiting_operator'):
+                    raise MotionError('WORLD_CONTROL_NOT_AVAILABLE')
+                self.paused = command == 'pause_world'
+                self.velocity[:] = 0
+            elif command == 'pause':
                 self.paused = True
                 self.velocity[:] = 0
                 if self.job and self.job.get('preplanning'):
@@ -288,9 +317,9 @@ class Engine(JogMixin):
             self.changed.notify_all()
             return self.snapshot()
 
-    def manual(self, joint_name, delta_deg, key, expected_revision):
+    def manual(self, joint_name, delta_deg, key, expected_revision, incarnation=None):
         with self.changed:
-            request = json.dumps([joint_name, delta_deg, expected_revision], allow_nan=False)
+            request = json.dumps([joint_name, delta_deg, expected_revision, incarnation], allow_nan=False)
             if key in self.manual_requests:
                 previous, job_id = self.manual_requests[key]
                 if request != previous:
@@ -298,7 +327,10 @@ class Engine(JogMixin):
                 return job_id
             if joint_name not in NAMES or isinstance(delta_deg, bool) or not isinstance(delta_deg, (int, float)) or not math.isfinite(delta_deg) or not 0 < abs(delta_deg) <= 5:
                 raise MotionError('INVALID_ARGUMENT')
-            if expected_revision != self.rev:
+            if incarnation is not None and incarnation != self.incarnation:
+                raise MotionError('SESSION_CHANGED')
+            frame = self.frames.get(expected_revision) if type(expected_revision) is int else None
+            if not frame or frame['incarnation'] != self.incarnation or frame['configuration_revision'] != self.config or not np.allclose(frame['q_rad'], self.q, atol=1e-10, rtol=0):
                 raise MotionError('START_STATE_CHANGED')
             goal = self.q.copy()
             goal[NAMES.index(joint_name)] += math.radians(delta_deg)
@@ -344,7 +376,7 @@ class Engine(JogMixin):
             self.status = 'planning'
             self.paused = False
             if program and program.get('preset'):
-                self.job.update(preplanning=True, start_after_planning=True, preset=program['preset'])
+                self.job.update(preplanning=True, start_after_planning=True, preset=program['preset'], dry_verified=False)
                 self.paused = True
             self.queue.clear()
             self.action = None
@@ -393,7 +425,7 @@ class Engine(JogMixin):
                 self.job.update(status='succeeded', end_reason='operator_handoff')
                 self.epoch += 1
             p, n, *_ = arm.fk(self.q, BASE)
-            candidates = recovery_candidates(mode, p.tolist(), n.tolist(), self.liquid.ladle)
+            candidates = recovery_candidates(mode, p.tolist(), n.tolist(), self.liquid.ladle, self.q)
             program = {'revision': 'preset-' + mode, 'code': '# Checked system preset: ' + mode,
                        'actions': [], 'preset': mode, 'candidates': candidates}
             job_id = self.start('preset:'+key, program=program, origin='recovery')
@@ -405,7 +437,7 @@ class Engine(JogMixin):
             raise MotionError('INVALID_START_STATE')
         if clearance(start)[0] < 0:
             raise MotionError('INITIAL_COLLISION')
-        if action.get('kind') in ('wait', 'scoop'):
+        if action.get('kind') in ('wait', 'scoop', 'verify_dry'):
             return [start.copy() for _ in range(math.ceil(action['duration_s'] / DT))], clearance(start)[0]
         if action.get('kind') == 'move_joints':
             goal = np.asarray(action['q_rad'], dtype=float)
@@ -467,17 +499,36 @@ class Engine(JogMixin):
         try:
             prepared = None
             if program and program.get('preset'):
+                planning_started = time.perf_counter()
                 with self.changed:
                     initial_q = self.q.copy()
+                    initial_liquid = deepcopy(self.liquid)
                 failures = []
-                for candidate in program['candidates']:
+                for candidate_index, candidate in enumerate(program['candidates']):
                     try:
                         paths, q = [], initial_q.copy()
-                        for item in candidate:
+                        predicted = deepcopy(initial_liquid)
+                        dry_verified = False
+                        for segment_index, item in enumerate(candidate):
                             with self.changed:
                                 if epoch != self.epoch:
                                     return
+                                self.job['planning_progress'] = {'candidate': candidate_index+1, 'segment': segment_index+1,
+                                    'segments': len(candidate), 'name': item['name'], 'elapsed_s': time.perf_counter()-planning_started}
+                                self.publish()
                             path, gap = self.plan(item, q)
+                            for sample in path:
+                                p, n, *_ = arm.fk(sample, BASE)
+                                if item.get('requires_dry') and (not dry_verified or predicted.ladle > DRY_LIMIT_M3 or
+                                        predicted.geometry.connected_volume(p, n, predicted.height) is not None):
+                                    raise MotionError('DOCK_DRY_INTERLOCK')
+                                predicted.advance(DT, p, n)
+                                if predicted.spill-initial_liquid.spill > DRY_LIMIT_M3:
+                                    raise MotionError('PREDICTED_SPILL')
+                            if item['kind'] == 'verify_dry':
+                                if predicted.ladle > DRY_LIMIT_M3 or sum(p['v'] for p in predicted.packets) > DRY_LIMIT_M3:
+                                    raise MotionError('DRAIN_INCOMPLETE')
+                                dry_verified = True
                             q = path[-1]
                             paths.append((path, gap))
                         prepared = paths
@@ -494,7 +545,11 @@ class Engine(JogMixin):
                         raise MotionError('START_STATE_CHANGED')
                     self.code_source = code_view(program['actions'])
                     self.code_hash = hashlib.sha256(self.code_source.encode()).hexdigest()
-                    self.job.update(code_hash=self.code_hash, preplanning=False)
+                    self.job.update(code_hash=self.code_hash, preplanning=False,
+                                    planning_wall_s=time.perf_counter()-planning_started,
+                                    planned_duration_s=sum(len(path)*DT for path, gap in prepared),
+                                    predicted_spill_increment_m3=predicted.spill-initial_liquid.spill,
+                                    planned_samples=sum(len(path) for path, gap in prepared))
                     self.paused = not self.job['start_after_planning']
             actions = [{**a, 'source_line': index + 3} for index, a in enumerate(program['actions'])] if program else main(Robot())
             for index, action in enumerate(actions):
@@ -528,7 +583,7 @@ class Engine(JogMixin):
                 if epoch == self.epoch:
                     if program and program.get('preset') == 'dock':
                         p, n, *_ = arm.fk(self.q, BASE)
-                        if np.linalg.norm(p-DOCK) > .001 or n[2] < .99 or self.liquid.ladle > .5e-6:
+                        if np.linalg.norm(p-DOCK) > .001 or n[2] < .99 or not self.job.get('dry_verified') or self.liquid.ladle > DRY_LIMIT_M3:
                             raise MotionError('PARK_CONDITIONS_NOT_MET')
                         self.status = self.job['status'] = 'waiting_operator'
                     else:

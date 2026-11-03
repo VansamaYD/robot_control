@@ -34,7 +34,7 @@ class GeometryAndLiquidTests(unittest.TestCase):
         initial_height = liquid.height
         for _ in range(35):
             liquid.advance(.02, [0, -.1, .075], [0, 0, 1], 30e-6)
-        self.assertAlmostEqual(liquid.ladle, 30e-6, places=12)
+        self.assertAlmostEqual(liquid.ladle, liquid.capacity, places=12)
         self.assertLess(liquid.height, initial_height)
         self.assertAlmostEqual(liquid.total(), liquid.initial, places=12)
 
@@ -51,10 +51,11 @@ class GeometryAndLiquidTests(unittest.TestCase):
             liquid.advance(.02, point, [0, 0, 1], 30e-6)
             self.assertEqual(liquid.ladle, 0)
 
-    def test_tilted_ladle_cannot_scoop(self):
+    def test_tilted_ladle_has_natural_exchange_but_not_process_ready(self):
         liquid = self.liquid()
         liquid.advance(.02, [0, -.1, .075], [1, 0, 0], 30e-6)
-        self.assertEqual(liquid.ladle, 0)
+        self.assertGreater(liquid.ladle, 0)
+        self.assertFalse(liquid.scoop_diagnostics([0, -.1, .075], [1, 0, 0], 30e-6)['ready'])
 
     def test_pour_hits_chicken_and_returns(self):
         liquid = self.liquid()

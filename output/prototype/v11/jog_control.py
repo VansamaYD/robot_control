@@ -7,7 +7,7 @@ import uuid
 import numpy as np
 from errors import MotionError
 from arm_model import LOW, HIGH
-from trajectory_sim import clearance
+from collision_model import clearance
 
 LEASE_S = .35
 SPEED = math.radians(4)

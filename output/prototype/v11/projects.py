@@ -55,6 +55,8 @@ def code_view(actions):
             call = f"move_joints({action['name']!r}, {action['q_rad']!r}, {action['duration_s']!r})"
         elif action['kind'] == 'scoop':
             call = f"scoop({action['name']!r}, {round(action['target_m3'] * 1e6, 6)!r}, {action['duration_s']!r})"
+        elif action['kind'] == 'verify_dry':
+            call = f"verify_dry({action['name']!r})"
         else:
             call = f"wait({action['name']!r}, {action['duration_s']!r})"
         lines.append('    yield robot.' + call)

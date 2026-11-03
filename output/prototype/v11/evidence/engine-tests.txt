@@ -1,5 +1,5 @@
 Observed console run: python3 -m unittest discover -s output/prototype/v11 -p test_*.py -v
-Ran 53 tests in 30.159s
+Ran 63 tests in 11.011s
 OK
 
-Includes the expected RECOVERY_PATH_UNAVAILABLE negative-case traceback; the assertion passed and no motion occurred. This file summarizes the completed console run, not a new execution.
+Includes the expected RECOVERY_PATH_UNAVAILABLE negative-case traceback. Summary of the completed console run, not a new execution.

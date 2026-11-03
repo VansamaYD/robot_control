@@ -5,7 +5,14 @@
       "name": "explicit_reset_restores_pose_liquid_time_but_keeps_programs",
       "status": "passed",
       "details": {
-        "incarnation": "boot-1db2d03619954b788a1978c21d920f8d"
+        "incarnation": "boot-0171e6703ee84bf8893dd63bc6c9d4db"
+      }
+    },
+    {
+      "name": "stationary_cup_naturally_fills_without_a_recipe",
+      "status": "passed",
+      "details": {
+        "filled_ml": 30.400000000000016
       }
     },
     {
@@ -37,7 +44,7 @@
       }
     },
     {
-      "name": "home_recovers_without_refilling_or_resetting",
+      "name": "home_preserves_total_with_natural_exchange",
       "status": "passed",
       "details": {}
     },
@@ -46,17 +53,26 @@
       "status": "passed",
       "details": {
         "tcp_m": [
-          -0.23999999998536276,
-          -0.29999999999467264,
-          0.1950004242796406
+          -0.23999999999335225,
+          -0.2999999999973763,
+          0.19500082489281495
         ],
-        "ladle_ml": 0.41746004900095224
+        "ladle_ml": 0.00071021916437806
       }
     },
     {
       "name": "operator_handoff_returns_from_park_to_ready_pick",
       "status": "passed",
       "details": {}
+    },
+    {
+      "name": "initially_empty_dock_still_drains_natural_inlet_before_exit",
+      "status": "passed",
+      "details": {
+        "planning_wall_s": 8.641669875010848,
+        "planned_duration_s": 55.300000000000004,
+        "remaining_ml": 0.00071021916437806
+      }
     }
   ]
 }

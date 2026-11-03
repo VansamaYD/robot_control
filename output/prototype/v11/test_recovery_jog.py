@@ -146,6 +146,10 @@ class RecoveryTests(unittest.TestCase):
         frame = finish(engine)
         self.assertEqual(frame['status'], 'waiting_operator', frame['job'])
         self.assertTrue(frame['parking']['virtual_parked'])
+        self.assertTrue(frame['job']['dry_verified'])
+        self.assertLess(frame['liquid']['ladle_m3'], 1e-9)
+        self.assertEqual(frame['job']['predicted_spill_increment_m3'], 0)
+        self.assertLess(frame['job']['dry_check']['ladle_m3'], 1e-9)
         np.testing.assert_allclose(frame['tcp_m'], DOCK, atol=.001)
         self.assertFalse(frame['parking']['support_contact_validated'])
         with self.assertRaisesRegex(MotionError, 'CONTROL_BUSY'):
