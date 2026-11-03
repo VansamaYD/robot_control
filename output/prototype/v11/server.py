@@ -5,6 +5,8 @@ from urllib.parse import urlparse, parse_qs, unquote
 import argparse
 import json
 import secrets
+import threading
+from render_service import Renderer
 
 from engine import Engine, ROOT, MotionError, Robot, main
 from projects import ProjectStore
@@ -16,6 +18,9 @@ def serve(port):
     default = store.save('默认浇汁流程', [{k: v for k, v in action.items() if k != 'source_line'} for action in main(Robot())])
     engine = Engine(default_program=default)
     token = secrets.token_urlsafe(32)
+    clients = {token: {'principal': 'ui', 'origin': 'ui'}}
+    clients_lock = threading.Lock()
+    renderer = Renderer(engine, port)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -42,16 +47,31 @@ def serve(port):
             path = urlparse(self.path)
             try:
                 if path.path == '/api/bootstrap':
-                    return self.reply({'token': token, 'code': engine.code_source,
+                    render_ticket = parse_qs(path.query).get('render_ticket', [None])[0]
+                    if render_ticket is not None:
+                        renderer.read(render_ticket)
+                    return self.reply({**({'token': token} if render_ticket is None else {}), 'code': engine.code_source,
                                        'model': engine.model, 'scene': SCENE, 'default_program': default,
                                        'projects': store.list(), 'dt_s': .02})
+                if path.path == '/api/capabilities':
+                    return self.reply({'version': '0.13.0', 'mode': 'simulation', 'mcp_stdio': True,
+                                       'render_snapshot': True, 'manual_joint_steps': True,
+                                       'arbitrary_python': False, 'hardware': False, 'vision': False})
                 if path.path == '/api/projects':
                     return self.reply(store.list())
                 if path.path.startswith('/api/projects/'):
                     return self.reply(store.get(path.path.rsplit('/', 1)[-1]))
                 if path.path == '/api/state':
+                    render_ticket = parse_qs(path.query).get('render_ticket', [None])[0]
+                    if render_ticket is not None:
+                        return self.reply(renderer.read(render_ticket))
+                    expected_boot = parse_qs(path.query).get('incarnation', [engine.incarnation])[0]
+                    if expected_boot != engine.incarnation:
+                        raise MotionError('SESSION_CHANGED')
                     revision = parse_qs(path.query).get('revision', [None])[0]
                     return self.reply(engine.snapshot(int(revision) if revision is not None else None))
+                if path.path.startswith('/api/jobs/'):
+                    return self.reply(engine.get_job(path.path.rsplit('/', 1)[-1]))
                 if path.path == '/api/events':
                     with engine.lock:
                         return self.reply(engine.events.copy())
@@ -67,7 +87,9 @@ def serve(port):
                 return self.reply({'error': str(error)}, 400)
 
         def do_POST(self):
-            if not self.valid_host() or self.headers.get('X-Session-Token') != token:
+            with clients_lock:
+                client = clients.get(self.headers.get('X-Session-Token'))
+            if not self.valid_host() or client is None:
                 return self.reply({'error': 'NOT_AUTHORIZED'}, 403)
             origin = self.headers.get('Origin')
             if origin and origin not in (f'http://127.0.0.1:{port}', f'http://localhost:{port}'):
@@ -79,19 +101,56 @@ def serve(port):
                 data = json.loads(self.rfile.read(size))
                 if not isinstance(data, dict):
                     raise MotionError('INVALID_ARGUMENT')
+                if self.path == '/api/clients':
+                    if client['principal'] != 'ui':
+                        raise MotionError('NOT_AUTHORIZED')
+                    with clients_lock:
+                        if len(clients) >= 32:
+                            raise MotionError('CLIENT_LIMIT')
+                        capability = secrets.token_urlsafe(32)
+                        identity = {'principal': 'mcp:' + secrets.token_hex(12), 'origin': 'mcp'}
+                        clients[capability] = identity
+                    return self.reply({'token': capability, **identity})
                 if self.path == '/api/run':
                     key = data.get('idempotency_key')
                     if not isinstance(key, str) or not 0 < len(key) <= 200:
                         raise MotionError('INVALID_ARGUMENT')
                     program = store.get(data['program_revision']) if 'program_revision' in data else default
-                    return self.reply({'job_id': engine.start(key, data.get('configuration_revision'), program)})
+                    return self.reply({'job_id': engine.start(key, data.get('configuration_revision'), program, **client)})
+                if self.path == '/api/manual':
+                    if client['principal'] != 'ui':
+                        raise MotionError('NOT_AUTHORIZED')
+                    key = data.get('idempotency_key')
+                    if not isinstance(key, str) or not 0 < len(key) <= 200:
+                        raise MotionError('INVALID_ARGUMENT')
+                    return self.reply({'job_id': engine.manual(data.get('joint_name'), data.get('delta_deg'), key, data.get('expected_state_revision'))})
+                if self.path == '/api/images':
+                    return self.reply(renderer.render(data.get('state_revision'), data.get('width', 1280), data.get('height', 720), data.get('view', 'default'), data.get('incarnation')))
+                if self.path == '/api/validate':
+                    program = store.get(data.get('program_revision'))
+                    frame = engine.snapshot()
+                    import numpy as np
+                    q = np.array(frame['q_rad'])
+                    samples, gap = 0, float('inf')
+                    for action in program['actions']:
+                        path_samples, clearance_m = engine.plan(action, q)
+                        q = path_samples[-1]
+                        samples += len(path_samples)
+                        gap = min(gap, clearance_m)
+                    return self.reply({'valid': True, 'level': 'kinematic_path', 'liquid_validation': False,
+                                       'program_revision': program['revision'], 'start_state_revision': frame['state_revision'],
+                                       'configuration_revision': frame['configuration_revision'],
+                                       'samples': samples, 'minimum_coarse_clearance_m': gap,
+                                       'note': 'Motion will be checked again on execution; liquid availability is checked at runtime.'})
                 if self.path == '/api/projects':
                     return self.reply(store.save(data.get('name'), data.get('actions')))
                 if self.path == '/api/control':
-                    return self.reply(engine.control(data.get('command')))
+                    if client['principal'] != 'ui' and not isinstance(data.get('job_id'), str):
+                        raise MotionError('JOB_ID_REQUIRED')
+                    return self.reply(engine.control(data.get('command'), data.get('job_id'), client['principal']))
                 if self.path == '/api/speed':
                     speed = data.get('speed')
-                    if speed not in (1, 4, 8):
+                    if type(speed) is not int or speed not in (1, 4, 8) or client['principal'] != 'ui':
                         raise MotionError('INVALID_ARGUMENT')
                     with engine.lock:
                         engine.speed = speed

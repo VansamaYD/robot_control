@@ -1,0 +1,64 @@
+{
+  "tests": [
+    {
+      "name": "initialize_discover_and_read_without_credentials_leak",
+      "status": "passed",
+      "details": {
+        "tools": [
+          "get_capabilities",
+          "get_scene",
+          "get_robot_state",
+          "list_programs",
+          "get_program_revision",
+          "validate_program",
+          "run_program",
+          "get_job",
+          "cancel_job",
+          "pause_job",
+          "resume_job",
+          "render_snapshot"
+        ]
+      }
+    },
+    {
+      "name": "validate_saved_program_without_motion",
+      "status": "passed",
+      "details": {
+        "samples": 1500
+      }
+    },
+    {
+      "name": "shared_job_idempotency_owner_and_pause",
+      "status": "passed",
+      "details": {
+        "job_id": "run-db3a4cee9707403d8935ebafdf06f3ea"
+      }
+    },
+    {
+      "name": "render_real_png_at_pinned_state",
+      "status": "passed",
+      "details": {
+        "bytes": 107834,
+        "state_revision": 7945,
+        "image_sha256": "298cf5d1e76daff7cc878495350001ce93a55cc01bdcdee17cda202df9d35035"
+      }
+    },
+    {
+      "name": "different_mcp_client_cannot_cancel_foreign_job",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "name": "old_cancel_and_foreign_manual_cannot_interrupt_current_job",
+      "status": "passed",
+      "details": {}
+    },
+    {
+      "name": "unknown_fields_and_missing_snapshot_fail_explicitly",
+      "status": "passed",
+      "details": {}
+    }
+  ],
+  "scope": "official SDK stdio client -> adapter -> shared simulator",
+  "status": "passed"
+}

@@ -1,3 +1,13 @@
+test_cancel_old_job_cannot_cancel_new_one (test_control_features.ControlFeaturesTests.test_cancel_old_job_cannot_cancel_new_one) ... ok
+test_cross_owner_cancel_denied (test_control_features.ControlFeaturesTests.test_cross_owner_cancel_denied) ... ok
+test_idempotency_is_namespaced_by_principal (test_control_features.ControlFeaturesTests.test_idempotency_is_namespaced_by_principal) ... ok
+test_invalid_joint_vector_schema_rejected (test_control_features.ControlFeaturesTests.test_invalid_joint_vector_schema_rejected) ... ok
+test_joint_goal_and_velocity_fields_have_model_order (test_control_features.ControlFeaturesTests.test_joint_goal_and_velocity_fields_have_model_order) ... ok
+test_joint_goal_limit_rejected_without_changing_pose (test_control_features.ControlFeaturesTests.test_joint_goal_limit_rejected_without_changing_pose) ... ok
+test_manual_finite_move_and_retry (test_control_features.ControlFeaturesTests.test_manual_finite_move_and_retry) ... ok
+test_manual_stale_start_rejected (test_control_features.ControlFeaturesTests.test_manual_stale_start_rejected) ... ok
+test_new_service_jobs_do_not_reuse_old_ids (test_control_features.ControlFeaturesTests.test_new_service_jobs_do_not_reuse_old_ids) ... ok
+test_wait_does_not_bypass_invalid_start_limits (test_control_features.ControlFeaturesTests.test_wait_does_not_bypass_invalid_start_limits) ... ok
 test_all_samples_obey_limits_and_coarse_screen (test_engine.EngineTests.test_all_samples_obey_limits_and_coarse_screen) ... ok
 test_cancel_invalidates_plan_finishing_late (test_engine.EngineTests.test_cancel_invalidates_plan_finishing_late) ... ok
 test_canonical_urdf_and_final_fk_agree (test_engine.EngineTests.test_canonical_urdf_and_final_fk_agree) ... ok
@@ -30,6 +40,6 @@ test_tampered_actions_detected (test_liquid_projects.ProjectTests.test_tampered_
 test_unknown_actions_and_fields_rejected (test_liquid_projects.ProjectTests.test_unknown_actions_and_fields_rejected) ... ok
 
 ----------------------------------------------------------------------
-Ran 30 tests in 3.913s
+Ran 40 tests in 5.895s
 
 OK

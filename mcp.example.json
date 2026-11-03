@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "robot-control-simulation": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/robot_control/output/prototype/v11/mcp_server.mjs"],
+      "env": {"WORKBENCH_URL": "http://127.0.0.1:8765/"}
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "tests": [
+    {
+      "name": "manual_joint_step_and_goal_telemetry",
+      "status": "passed"
+    },
+    {
+      "name": "ui_pinned_snapshot_preview_and_download",
+      "status": "passed"
+    },
+    {
+      "name": "manual_resume_reaches_checked_target",
+      "status": "passed"
+    }
+  ],
+  "status": "passed"
+}

@@ -1,0 +1,50 @@
+{
+  "session_id": "local-v11",
+  "incarnation": "boot-956489968546250",
+  "state_revision": 7945,
+  "tick": 7905,
+  "simulation_time_s": 158.1,
+  "configuration_revision": "S_BASE-geometry-1",
+  "source": "simulation",
+  "q_rad": [
+    -0.0006737953337420657,
+    0.39678179868198055,
+    1.1358878567661927,
+    -1.5326631475543058,
+    0.048682153576007386
+  ],
+  "liquid": {
+    "mode": "uncalibrated_volume_approximation",
+    "height_m": 0.07947340299892626,
+    "capacity_m3": 0.00003272492347489368,
+    "pot_m3": 0.0020939885022284613,
+    "ladle_m3": 0.000029999999999999997,
+    "air_m3": 0,
+    "surface_m3": 4.93369635979271e-23,
+    "spill_m3": 0,
+    "initial_m3": 0.0021239885022284865,
+    "balance_error_m3": -2.5153490401663703e-17,
+    "packets": []
+  },
+  "camera": {
+    "position": [
+      -1.05,
+      -0.12,
+      0.3
+    ],
+    "target": [
+      0,
+      -0.12,
+      0.13
+    ],
+    "up": [
+      0,
+      0,
+      1
+    ],
+    "fov": 39
+  },
+  "width": 1280,
+  "height": 720,
+  "image_sha256": "298cf5d1e76daff7cc878495350001ce93a55cc01bdcdee17cda202df9d35035"
+}

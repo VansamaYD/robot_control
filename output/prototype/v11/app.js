@@ -5,12 +5,13 @@ import { OrbitControls } from '/assets/OrbitControls.js';
 const $ = (id) => document.getElementById(id);
 const parameters = new URLSearchParams(location.search);
 const requestedRevision = parameters.get('snapshot');
+const renderTicket = parameters.get('render_ticket');
 if (parameters.has('capture')) document.body.classList.add('capture');
 window.__ready = false;
 window.__errors = [];
 
 try {
-  const bootstrap = await (await fetch('/api/bootstrap')).json();
+  const bootstrap = await (await fetch('/api/bootstrap' + (renderTicket ? '?render_ticket=' + encodeURIComponent(renderTicket) : ''))).json();
   let selectedProgram = bootstrap.default_program;
   function showCode(code) {
   $('source').replaceChildren();
@@ -38,6 +39,8 @@ try {
   camera.position.set(.70, -.98, .68);
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, -.12, .13);
+  if (parameters.get('view') === 'top') { camera.position.set(0, -.12, 1.25); camera.up.set(0, 1, 0); }
+  if (parameters.get('view') === 'side') camera.position.set(-1.05, -.12, .30);
   controls.enableDamping = true;
   scene.add(new THREE.HemisphereLight(0xd7e7ff, 0x45586b, 3.2));
   const key = new THREE.DirectionalLight(0xfff0db, 4);
@@ -128,6 +131,23 @@ try {
   scene.add(trajectory);
   const history = [];
   let current = null;
+  const jointRows = model.joint_order.map(name => {
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td'); nameCell.textContent = name; nameCell.title = name;
+    row.append(nameCell);
+    const values = Array.from({ length: 3 }, () => document.createElement('td'));
+    row.append(...values);
+    const commands = document.createElement('td');
+    const buttons = [-1, 1].map(delta => {
+      const button = document.createElement('button'); button.textContent = delta < 0 ? '−' : '+';
+      button.setAttribute('aria-label', `${name} ${delta < 0 ? '减少' : '增加'} 1度`);
+      button.onclick = () => act(() => post('/api/manual', { joint_name: name, delta_deg: delta,
+        expected_state_revision: current.state_revision, idempotency_key: crypto.randomUUID() }))();
+      commands.append(button); return button;
+    });
+    row.append(commands); $('joints').append(row);
+    return { values, buttons };
+  });
   const labels = { ready: '就绪 · 暂停', planning: '计算并检查轨迹', running: '执行中', succeeded: '流程完成', cancelled: '已取消', failed: '执行失败' };
   function drawState(state) {
     model.joint_order.forEach((name, i) => {
@@ -174,22 +194,24 @@ try {
       trajectory.geometry.dispose(); trajectory.geometry = new THREE.BufferGeometry().setFromPoints(history);
     }
     current = state;
-    $('status').textContent = labels[state.status] ?? state.status;
-    $('connection').textContent = `${visualCount} 个正式网格 · 服务在线`;
+    $('status').textContent = state.paused && ['planning', 'running'].includes(state.job?.status) ? '已暂停' : labels[state.status] ?? state.status;
+    $('connection').textContent = `${visualCount} 个网格 · ${state.job?.origin === 'mcp' ? 'MCP任务' : state.job?.origin === 'manual' ? '手动任务' : '本地流程'} · 服务在线`;
     $('frame').textContent = `快照 #${state.state_revision} · tick ${state.tick}`;
     $('time').textContent = `${state.simulation_time_s.toFixed(2)} s`;
     $('action').textContent = state.action?.name ?? '待机 · 初始暂停';
     $('hash').textContent = state.code_hash.slice(0, 12);
     $('tcp').textContent = state.tcp_m.map(value => (value * 1000).toFixed(1)).join(', ');
-    $('joints').replaceChildren(...state.joint_names.map((name, i) => {
-      const row = document.createElement('tr');
-      for (const value of [name, (state.q_rad[i] * 180 / Math.PI).toFixed(3) + '°']) {
-        const cell = document.createElement('td'); cell.textContent = value; row.append(cell);
-      }
-      return row;
-    }));
+    state.joint_names.forEach((name, i) => {
+      const [position, goal, velocity] = jointRows[i].values;
+      position.textContent = (state.q_rad[i] * 180 / Math.PI).toFixed(2);
+      goal.textContent = (state.target_q_rad[i] * 180 / Math.PI).toFixed(2);
+      goal.title = `剩余 ${(180 / Math.PI * (state.target_q_rad[i] - state.q_rad[i])).toFixed(2)}°（终点与当前位置差，非伺服跟随误差）`;
+      velocity.textContent = (state.velocity_rad_s[i] * 180 / Math.PI).toFixed(2);
+      position.title = `限位 ${state.joint_limits_rad[i].map(value => (value * 180 / Math.PI).toFixed(1)).join(' 至 ')}°`;
+    });
     document.querySelectorAll('#source div').forEach(row => row.classList.toggle('active', state.job?.program_revision === selectedProgram.revision && Number(row.dataset.line) === state.action?.source_line));
     const busy = ['planning', 'running'].includes(state.job?.status);
+    jointRows.forEach(row => row.buttons.forEach(button => { button.disabled = busy; }));
     $('run').disabled = busy;
     $('pause').disabled = !busy || state.paused;
     $('resume').disabled = !busy || !state.paused;
@@ -203,10 +225,12 @@ try {
   }
   window.__applySnapshot = drawState; // Test seam: render-only, does not write service state.
   async function update() {
-    const response = await fetch('/api/state' + (requestedRevision ? '?revision=' + encodeURIComponent(requestedRevision) : ''));
+    const query = renderTicket ? '?render_ticket=' + encodeURIComponent(renderTicket) : requestedRevision ? '?revision=' + encodeURIComponent(requestedRevision) : '';
+    const response = await fetch('/api/state' + query);
     const state = await response.json();
     if (!response.ok) throw new Error(state.error);
-    if (['planning', 'running'].includes(state.job?.status) && state.job.program_revision !== selectedProgram.revision) {
+    if (current && current.incarnation === state.incarnation && state.state_revision < current.state_revision) return;
+    if (['planning', 'running'].includes(state.job?.status) && state.job.origin !== 'manual' && state.job.program_revision !== selectedProgram.revision) {
       const programResponse = await fetch('/api/projects/' + state.job.program_revision);
       if (!programResponse.ok) throw new Error('运行版本不可读取');
       displayProgram(await programResponse.json());
@@ -268,8 +292,20 @@ try {
     $('editor').hidden = true;
     return post('/api/run', { idempotency_key: crypto.randomUUID(), program_revision: selectedProgram.revision });
   });
+  $('snapshot').onclick = act(async () => {
+    $('snapshot').disabled = true;
+    try {
+      const image = await post('/api/images', { state_revision: current.state_revision, incarnation: current.incarnation });
+      $('snapshot-preview').src = 'data:image/png;base64,' + image.data;
+      $('snapshot-preview').hidden = false;
+      $('snapshot-download').href = $('snapshot-preview').src;
+      $('snapshot-download').download = `frame-${image.metadata.state_revision}.png`;
+      $('snapshot-download').hidden = false;
+      $('snapshot-label').textContent = `快照 #${image.metadata.state_revision} · ${image.metadata.simulation_time_s.toFixed(2)}s`;
+    } finally { $('snapshot').disabled = false; }
+  });
   for (const [id, command] of [['pause', 'pause'], ['resume', 'resume'], ['step', 'step_tick'], ['cancel', 'cancel']]) {
-    $(id).onclick = act(() => post('/api/control', { command }));
+    $(id).onclick = act(() => post('/api/control', { command, job_id: current.job?.job_id }));
   }
   $('speed').onchange = act(() => post('/api/speed', { speed: Number($('speed').value) }));
   function resize() {
@@ -281,7 +317,7 @@ try {
   await update(); controls.update(); renderer.render(scene, camera);
   window.__ready = true;
   render();
-  if (!requestedRevision) {
+  if (!requestedRevision && !renderTicket) {
     setInterval(() => update().catch(error => {
       $('connection').textContent = '状态连接中断';
       window.__errors.push(error.message);

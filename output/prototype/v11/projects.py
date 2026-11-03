@@ -17,6 +17,7 @@ def validate(actions):
             raise ValueError(f'INVALID_ACTION:{index}')
         kind = action.get('kind')
         fields = {'move_tcp': {'kind', 'name', 'p', 'n', 'duration_s'},
+                  'move_joints': {'kind', 'name', 'q_rad', 'duration_s'},
                   'scoop': {'kind', 'name', 'target_m3', 'duration_s'},
                   'wait': {'kind', 'name', 'duration_s'}}.get(kind)
         if fields is None or set(action) != fields:
@@ -37,6 +38,10 @@ def validate(actions):
             v = action['target_m3']
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 < v <= 32.725e-6:
                 raise ValueError(f'INVALID_SCOOP_VOLUME:{index}')
+        if kind == 'move_joints':
+            q = action['q_rad']
+            if not isinstance(q, list) or len(q) != 5 or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) for x in q):
+                raise ValueError(f'INVALID_JOINT_VECTOR:{index}')
         result.append(deepcopy(action))
     return result
 
@@ -46,6 +51,8 @@ def code_view(actions):
     for action in actions:
         if action['kind'] == 'move_tcp':
             call = f"move_tcp({action['name']!r}, {action['p']!r}, {action['n']!r}, {action['duration_s']!r})"
+        elif action['kind'] == 'move_joints':
+            call = f"move_joints({action['name']!r}, {action['q_rad']!r}, {action['duration_s']!r})"
         elif action['kind'] == 'scoop':
             call = f"scoop({action['name']!r}, {round(action['target_m3'] * 1e6, 6)!r}, {action['duration_s']!r})"
         else:

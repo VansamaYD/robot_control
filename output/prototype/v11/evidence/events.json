@@ -3,11 +3,11 @@
     "seq": 1,
     "tick": 0,
     "event": "job_created",
-    "job_id": "run-1"
+    "job_id": "run-40bedc777e2d44948f78b3914a2815fd"
   },
   {
     "seq": 2,
-    "tick": 2,
+    "tick": 8,
     "event": "action_started",
     "name": "舀取 30mL 汤汁",
     "line": 3,
@@ -15,13 +15,13 @@
   },
   {
     "seq": 3,
-    "tick": 37,
+    "tick": 43,
     "event": "action_completed",
     "name": "舀取 30mL 汤汁"
   },
   {
     "seq": 4,
-    "tick": 1078,
+    "tick": 1239,
     "event": "action_started",
     "name": "提勺",
     "line": 4,
@@ -29,13 +29,13 @@
   },
   {
     "seq": 5,
-    "tick": 1688,
+    "tick": 1849,
     "event": "action_completed",
     "name": "提勺"
   },
   {
     "seq": 6,
-    "tick": 2388,
+    "tick": 2788,
     "event": "action_started",
     "name": "移到鸡背上方",
     "line": 5,
@@ -43,13 +43,13 @@
   },
   {
     "seq": 7,
-    "tick": 2713,
+    "tick": 3113,
     "event": "action_completed",
     "name": "移到鸡背上方"
   },
   {
     "seq": 8,
-    "tick": 3261,
+    "tick": 3614,
     "event": "action_started",
     "name": "倾斜汤勺",
     "line": 6,
@@ -57,13 +57,13 @@
   },
   {
     "seq": 9,
-    "tick": 3461,
+    "tick": 3814,
     "event": "action_completed",
     "name": "倾斜汤勺"
   },
   {
     "seq": 10,
-    "tick": 3463,
+    "tick": 3819,
     "event": "action_started",
     "name": "保持倾角淋汁",
     "line": 7,
@@ -71,13 +71,13 @@
   },
   {
     "seq": 11,
-    "tick": 3588,
+    "tick": 3944,
     "event": "action_completed",
     "name": "保持倾角淋汁"
   },
   {
     "seq": 12,
-    "tick": 4024,
+    "tick": 4401,
     "event": "action_started",
     "name": "汤勺回正",
     "line": 8,
@@ -85,13 +85,13 @@
   },
   {
     "seq": 13,
-    "tick": 4224,
+    "tick": 4601,
     "event": "action_completed",
     "name": "汤勺回正"
   },
   {
     "seq": 14,
-    "tick": 4957,
+    "tick": 5411,
     "event": "action_started",
     "name": "返回取汁上方",
     "line": 9,
@@ -99,13 +99,13 @@
   },
   {
     "seq": 15,
-    "tick": 5282,
+    "tick": 5736,
     "event": "action_completed",
     "name": "返回取汁上方"
   },
   {
     "seq": 16,
-    "tick": 6619,
+    "tick": 7219,
     "event": "action_started",
     "name": "下降到取汁点",
     "line": 10,
@@ -113,13 +113,13 @@
   },
   {
     "seq": 17,
-    "tick": 7229,
+    "tick": 7829,
     "event": "action_completed",
     "name": "下降到取汁点"
   },
   {
     "seq": 18,
-    "tick": 7229,
+    "tick": 7830,
     "event": "job_succeeded"
   }
 ]
