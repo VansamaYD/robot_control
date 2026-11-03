@@ -1,0 +1,312 @@
+{
+  "config": {
+    "pot_diameter_mm": 400,
+    "pot_depth_mm": 120,
+    "liquid_height_mm": 80,
+    "chicken_size_mm": [
+      260,
+      180,
+      150
+    ],
+    "chicken_offset_y_mm": 50,
+    "ladle_diameter_mm": 50,
+    "ladle_depth_mm": 25,
+    "base_xyz_mm": [
+      0,
+      -400,
+      80
+    ],
+    "base_yaw_deg": 90,
+    "tool_offset_local_mm": [
+      -80,
+      0,
+      -90
+    ],
+    "arm_capsule_radius_mm": [
+      25,
+      25,
+      20,
+      20
+    ],
+    "tool_stem_radius_mm": 4,
+    "collision_margin_mm": 7.5,
+    "sample_period_s": 0.05,
+    "proposed_joint_speed_deg_s": 60,
+    "proposed_joint_accel_deg_s2": 150,
+    "proposed_joint_jerk_deg_s3": 1000,
+    "dry_tool_mass_kg": 0.1,
+    "liquid_mass_kg": 0.033
+  },
+  "scope": "Five-joint FK/IK, proposed custom tool, sampled capsule/bowl screening. Not full mesh, real dynamics, fluid or safety validation.",
+  "urdf_source": "https://github.com/TheRobotStudio/SO-ARM100/blob/main/Simulation/SO101/so101_new_calib.urdf",
+  "pick_mm": [
+    0.0,
+    -100.0,
+    75.0
+  ],
+  "lift_mm": [
+    0.0,
+    -100.0,
+    195.0
+  ],
+  "routes": [
+    {
+      "id": "A",
+      "target_mm": [
+        -40.0,
+        -20.0,
+        195.0
+      ],
+      "phases": [
+        {
+          "name": "取汁停留",
+          "start": 0,
+          "duration": 0.7
+        },
+        {
+          "name": "竖直抬勺",
+          "start": 0.7,
+          "duration": 12.2
+        },
+        {
+          "name": "高位平移",
+          "start": 12.9,
+          "duration": 6.5
+        },
+        {
+          "name": "定点倾倒",
+          "start": 19.4,
+          "duration": 4.0
+        },
+        {
+          "name": "等待滴流",
+          "start": 23.4,
+          "duration": 0.7
+        },
+        {
+          "name": "恢复水平",
+          "start": 24.1,
+          "duration": 4.0
+        },
+        {
+          "name": "空勺返回",
+          "start": 28.1,
+          "duration": 6.5
+        },
+        {
+          "name": "取汁区下降",
+          "start": 34.6,
+          "duration": 12.2
+        }
+      ],
+      "stats": {
+        "duration_s": 46.8,
+        "sample_count": 937,
+        "max_position_error_mm": 0.0009975926277987267,
+        "max_normal_error_deg": 0.0002637276251825078,
+        "minimum_coarse_clearance_mm": 7.518503779972683,
+        "minimum_joint_limit_margin_deg": 7.184740179461285,
+        "peak_joint_speed_deg_s": [
+          4.61,
+          12.55,
+          11.47,
+          13.07,
+          21.13
+        ],
+        "peak_joint_accel_deg_s2": [
+          3.75,
+          6.33,
+          6.25,
+          3.9,
+          16.2
+        ],
+        "peak_joint_jerk_deg_s3": [
+          8.1,
+          9.3,
+          9.5,
+          9.3,
+          35.0
+        ],
+        "peak_estimated_gravity_torque_nm": [
+          0.0,
+          0.664,
+          0.562,
+          0.189,
+          0.052
+        ]
+      }
+    },
+    {
+      "id": "B",
+      "target_mm": [
+        0.0,
+        -20.0,
+        195.0
+      ],
+      "phases": [
+        {
+          "name": "取汁停留",
+          "start": 0,
+          "duration": 0.7
+        },
+        {
+          "name": "竖直抬勺",
+          "start": 0.7,
+          "duration": 12.2
+        },
+        {
+          "name": "高位平移",
+          "start": 12.9,
+          "duration": 6.5
+        },
+        {
+          "name": "定点倾倒",
+          "start": 19.4,
+          "duration": 4.0
+        },
+        {
+          "name": "等待滴流",
+          "start": 23.4,
+          "duration": 0.7
+        },
+        {
+          "name": "恢复水平",
+          "start": 24.1,
+          "duration": 4.0
+        },
+        {
+          "name": "空勺返回",
+          "start": 28.1,
+          "duration": 6.5
+        },
+        {
+          "name": "取汁区下降",
+          "start": 34.6,
+          "duration": 12.2
+        }
+      ],
+      "stats": {
+        "duration_s": 46.8,
+        "sample_count": 937,
+        "max_position_error_mm": 0.0009761163884607868,
+        "max_normal_error_deg": 0.0003579440284449197,
+        "minimum_coarse_clearance_mm": 7.518503779972683,
+        "minimum_joint_limit_margin_deg": 7.184740179461285,
+        "peak_joint_speed_deg_s": [
+          4.58,
+          12.55,
+          11.02,
+          13.07,
+          20.82
+        ],
+        "peak_joint_accel_deg_s2": [
+          3.78,
+          6.26,
+          5.92,
+          7.91,
+          16.18
+        ],
+        "peak_joint_jerk_deg_s3": [
+          8.4,
+          9.3,
+          10.2,
+          21.8,
+          35.3
+        ],
+        "peak_estimated_gravity_torque_nm": [
+          0.0,
+          0.67,
+          0.562,
+          0.188,
+          0.05
+        ]
+      }
+    },
+    {
+      "id": "C",
+      "target_mm": [
+        40.0,
+        -20.0,
+        195.0
+      ],
+      "phases": [
+        {
+          "name": "取汁停留",
+          "start": 0,
+          "duration": 0.7
+        },
+        {
+          "name": "竖直抬勺",
+          "start": 0.7,
+          "duration": 12.2
+        },
+        {
+          "name": "高位平移",
+          "start": 12.9,
+          "duration": 6.5
+        },
+        {
+          "name": "定点倾倒",
+          "start": 19.4,
+          "duration": 4.0
+        },
+        {
+          "name": "等待滴流",
+          "start": 23.4,
+          "duration": 0.7
+        },
+        {
+          "name": "恢复水平",
+          "start": 24.1,
+          "duration": 4.0
+        },
+        {
+          "name": "空勺返回",
+          "start": 28.1,
+          "duration": 6.5
+        },
+        {
+          "name": "取汁区下降",
+          "start": 34.6,
+          "duration": 12.2
+        }
+      ],
+      "stats": {
+        "duration_s": 46.8,
+        "sample_count": 937,
+        "max_position_error_mm": 0.0009973136293544708,
+        "max_normal_error_deg": 0.00042833407749882474,
+        "minimum_coarse_clearance_mm": 7.518503779972683,
+        "minimum_joint_limit_margin_deg": 7.184740179461285,
+        "peak_joint_speed_deg_s": [
+          4.44,
+          12.55,
+          11.47,
+          13.07,
+          20.23
+        ],
+        "peak_joint_accel_deg_s2": [
+          3.69,
+          6.33,
+          9.23,
+          13.71,
+          15.96
+        ],
+        "peak_joint_jerk_deg_s3": [
+          8.1,
+          11.5,
+          25.2,
+          36.3,
+          35.0
+        ],
+        "peak_estimated_gravity_torque_nm": [
+          0.0,
+          0.704,
+          0.562,
+          0.188,
+          0.048
+        ]
+      }
+    }
+  ]
+}
