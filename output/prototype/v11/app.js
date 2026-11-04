@@ -85,6 +85,37 @@ try {
     wire.position.copy(a).add(b).multiplyScalar(.5);
     wire.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
   }
+  // Display-only accessory: never sent to the engine, collision or liquid model.
+  const temperatureProbe = new THREE.Group();
+  temperatureProbe.name = 'display-only-temperature-probe';
+  temperatureProbe.userData = {displayOnly:true, readingAvailable:false};
+  scene.add(temperatureProbe);
+  function probeRod(a, b, radius, mat=steel) {
+    const start=new THREE.Vector3(...a), end=new THREE.Vector3(...b), delta=end.clone().sub(start);
+    const rod=mesh(new THREE.CylinderGeometry(radius,radius,delta.length(),12),mat,temperatureProbe);
+    rod.position.copy(start).add(end).multiplyScalar(.5);
+    rod.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
+    return rod;
+  }
+  const probeTip=[0,.120,.050], probeHead=[0,.200,.155];
+  probeRod(probeTip,probeHead,.0025);
+  probeRod([0,.120,.050],[0,.129,.062],.0032,material(0xc5d9dc));
+  probeRod([0,.200,.155],[0,.210,.168],.006,material(0xd48b42));
+  probeRod([0,.198,.126],[0,.178,.126],.0025);
+  const probeClamp=mesh(new THREE.BoxGeometry(.016,.014,.009),steel,temperatureProbe);
+  probeClamp.position.set(0,.198,.124);
+  const leadCurve=new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0,.210,.168),new THREE.Vector3(.014,.237,.178),
+    new THREE.Vector3(.055,.253,.136),new THREE.Vector3(.075,.245,.060)]);
+  mesh(new THREE.TubeGeometry(leadCurve,28,.0018,8,false),material(0x323c48),temperatureProbe);
+  probeRod([.075,.245,.060],[.076,.244,.047],.004,material(0x434e5a));
+  const probeCanvas=document.createElement('canvas');probeCanvas.width=480;probeCanvas.height=80;
+  const probeContext=probeCanvas.getContext('2d');
+  probeContext.fillStyle='#10202de8';probeContext.fillRect(0,0,480,80);
+  probeContext.fillStyle='#f5cc91';probeContext.font='30px sans-serif';probeContext.textAlign='center';
+  probeContext.fillText('温度探头 · 仅示意',240,52);
+  const probeLabel=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(probeCanvas),depthTest:false}));
+  probeLabel.position.set(.055,.225,.250);probeLabel.scale.set(.140,.024,1);temperatureProbe.add(probeLabel);
   const pedestal = mesh(new THREE.BoxGeometry(.16, .15, .08), material(0x243747)); pedestal.position.set(0, -.4, .04);
   const park = geometry.parking.position_m;
   const parkRing = mesh(new THREE.TorusGeometry(.040, .0015, 8, 64), material(0xe9bc68));

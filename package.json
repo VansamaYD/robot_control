@@ -1,7 +1,7 @@
 {
   "name": "robot-control-workbench",
   "private": true,
-  "version": "0.19.0",
+  "version": "0.19.1",
   "type": "module",
   "scripts": {
     "test:browser": "node output/prototype/v11/verify_browser.cjs",
