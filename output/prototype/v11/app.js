@@ -290,11 +290,19 @@ try {
     return messages[details.reason] ?? details.reason;
   }
   function describeError(code, details) {
+    // Decode retained 0.17 job records too, so a refresh explains old failures.
+    const solvedButFast = code === 'NO_IK' && details?.position_error_m <= .0002 &&
+      details?.normal_error_rad <= .002 && details?.joint_step_rad > Math.PI/180*60*.02+1e-12;
+    if (code === 'JOINT_SPEED_LIMIT' || solvedButFast) {
+      const speed = details?.speed_deg_s ?? (details?.joint_step_rad ?? NaN)/.02*180/Math.PI;
+      if (!Number.isFinite(speed)) return '关节采样速度超限，请调整动作时长、位置或倾角后重试。';
+      return `关节采样速度约 ${speed.toFixed(1)}°/s，超过 ${details?.limit_deg_s ?? 60}°/s 上限；位置和方向已求解。请调整动作时长、位置或倾角后重试。`;
+    }
     if (['LIQUID_UNAVAILABLE', 'SCOOP_PRECONDITION_FAILED'].includes(code)) return `${describeReason(details)}。可“回取汁位”保留汤汁恢复，或“重置仿真”。`;
     if (code === 'RECOVERY_PATH_UNAVAILABLE' && details?.failures?.length) {
       const failure = details.failures.at(-1);
       const reason = { NO_IK: '位置或勺口方向未找到连续关节解', COLLISION: '路径可能碰撞',
-        LIMIT_VIOLATION: '关节速度、加速度或限位超限', PREDICTED_SPILL: '预测洒漏',
+        JOINT_SPEED_LIMIT: '关节采样速度超限', LIMIT_VIOLATION: '关节速度、加速度或限位超限', PREDICTED_SPILL: '预测洒漏',
         DETOUR_NOT_FOUND: '节点预算内未找到绕行路线', DETOUR_SEARCH_TIMEOUT: '绕行搜索达到时间上限',
         DETOUR_GOAL_UNREACHABLE: '绕行终点未找到可行姿态', DETOUR_ENDPOINT_INVALID: '绕行端点未通过检查',
         DRAIN_INCOMPLETE: '排汁未达近空条件', DOCK_DRY_INTERLOCK: '离锅近空检查未通过' }[failure.code] ?? failure.code;

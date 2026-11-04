@@ -506,9 +506,15 @@ class Engine(JogMixin):
                 stats['ik_points'] += 1
                 stats['fallback_points'] += int(diagnostics['attempts'] > 1)
                 stats['ik_iterations'] += diagnostics['iterations']
-            if pe > .0002 or ne > .002 or diagnostics['joint_step_rad'] > np.deg2rad(60)*DT+1e-12:
-                raise MotionError('NO_IK', {**diagnostics, 'sample': index, 'samples': count,
-                    'progress': index/count, 'target_m': p.tolist(), 'normal': n.tolist()})
+            failure = {**diagnostics, 'sample': index, 'samples': count,
+                       'progress': index/count, 'target_m': p.tolist(), 'normal': n.tolist()}
+            if pe > .0002 or ne > .002:
+                raise MotionError('NO_IK', failure)
+            if diagnostics['joint_step_rad'] > np.deg2rad(60)*DT+1e-12:
+                raise MotionError('JOINT_SPEED_LIMIT', {**failure,
+                    'joint_name': NAMES[int(np.argmax(np.abs(q-previous_q)))],
+                    'speed_deg_s': float(np.rad2deg(diagnostics['joint_step_rad']/DT)),
+                    'limit_deg_s': 60., 'duration_s': duration})
             gap, obstacle, *_ = clearance(q)
             minimum_gap = min(gap, minimum_gap)
             if gap < 0:

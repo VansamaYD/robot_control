@@ -1,5 +1,7 @@
 """Numerical correctness and recovery invariants for staged local planning."""
 import unittest
+import json
+from pathlib import Path
 from unittest.mock import patch
 import numpy as np
 from engine import Engine, MotionError, arm, BASE, DT
@@ -99,6 +101,31 @@ class PlanningTests(unittest.TestCase):
         engine.planning_context.epoch = engine.epoch-1
         with self.assertRaisesRegex(MotionError, 'PLANNING_CANCELLED'):
             engine.plan({'kind': 'wait', 'duration_s': 3}, engine.q)
+
+    def test_reported_pose_has_a_solution_but_exceeds_speed_limit(self):
+        fixture = json.loads((Path(__file__).parent/'evidence/reported-recipe-ik.json').read_text())
+        e = Engine(realtime=False)
+        before = e.snapshot()
+        with self.assertRaisesRegex(MotionError, 'JOINT_SPEED_LIMIT') as caught:
+            e.plan(fixture['action'], np.array(fixture['start_q_rad']))
+        self.assertLess(caught.exception.details['position_error_m'], .0002)
+        self.assertLess(caught.exception.details['normal_error_rad'], .002)
+        self.assertGreater(caught.exception.details['speed_deg_s'], 60)
+        self.assertEqual(e.snapshot(), before)
+
+    def test_adjusted_recipe_keeps_65_degrees_with_no_spill(self):
+        recipe = json.loads((Path(__file__).parents[2]/'examples/豉油鸡-偏移浇汁验证.json').read_text())
+        e = Engine(realtime=False)
+        q = HOME_Q.copy()
+        for action in recipe['actions']:
+            path, gap = e.plan(action, q)
+            self.assertGreaterEqual(gap, 0)
+            for sample in path:
+                p, n, *_ = arm.fk(sample, BASE)
+                e.liquid.advance(.02, p, n)
+            q = path[-1]
+        self.assertEqual(e.liquid.spill, 0)
+        self.assertAlmostEqual(e.liquid.total(), e.liquid.initial, places=12)
 
     def test_fallback_is_used_only_after_primary_failure(self):
         p, n, *_ = arm.fk(HOME_Q, BASE)
