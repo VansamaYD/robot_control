@@ -11,16 +11,25 @@ from render_service import Renderer
 from engine import Engine, ROOT, MotionError, Robot, main
 from projects import ProjectStore
 from scene_geometry import SCENE
+from recipe_library import three_zone_actions, THREE_ZONES
 
 
-def serve(port):
-    store = ProjectStore(ROOT.parents[2] / 'data/projects')
-    default = store.save('默认浇汁流程', [{k: v for k, v in action.items() if k != 'source_line'} for action in main(Robot())])
+def serve(port, data_dir=None):
+    store = ProjectStore(Path(data_dir) if data_dir else ROOT.parents[2] / 'data/projects')
+    default = store.save('标准流程 · 单点浇汁', [{k: v for k, v in action.items() if k != 'source_line'} for action in main(Robot())], builtin_key='standard')
+    store.save('左中右三点浇汁', three_zone_actions(), builtin_key='three-zone')
     engine = Engine(default_program=default)
     token = secrets.token_urlsafe(32)
     clients = {token: {'principal': 'ui', 'origin': 'ui'}}
     clients_lock = threading.Lock()
     renderer = Renderer(engine, port)
+
+    def sync_results():
+        with engine.lock:
+            completed = {j.get('program_revision'): dict(j) for j in engine.jobs.values()
+                         if j['status'] in ('succeeded', 'failed') and j.get('origin') != 'recovery'}
+        for revision, job in completed.items():
+            store.note_result(revision, job['job_id'], job['status'], job.get('error'))
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -47,23 +56,30 @@ def serve(port):
             path = urlparse(self.path)
             try:
                 if path.path == '/api/bootstrap':
+                    sync_results()
                     render_ticket = parse_qs(path.query).get('render_ticket', [None])[0]
                     if render_ticket is not None:
                         renderer.read(render_ticket)
                     return self.reply({**({'token': token} if render_ticket is None else {}), 'code': engine.code_source,
                                        'model': engine.model, 'scene': SCENE, 'default_program': default,
-                                       'projects': store.list(), 'dt_s': .02})
+                                       'projects': store.list(), 'pour_zones': THREE_ZONES, 'dt_s': .02})
                 if path.path == '/api/capabilities':
-                    return self.reply({'version': '0.15.0', 'mode': 'simulation', 'mcp_stdio': True,
+                    return self.reply({'version': '0.18.0', 'mode': 'simulation', 'mcp_stdio': True,
                                        'render_snapshot': True, 'manual_joint_steps': True,
                                        'leased_jog': True, 'recovery_presets': True,
                                        'natural_liquid_exchange': True, 'dock_dry_interlock': True,
+                                       'project_history': True, 'standard_recipe': True, 'three_zone_coverage': True,
                                        'dry_dock_detour': True, 'detour_scope': 'verified_dry_dock_transfer',
                                        'arbitrary_python': False, 'hardware': False, 'vision': False})
+                if path.path == '/api/library/export':
+                    return self.reply(store.export_library())
+                if path.path == '/api/library/history':
+                    return self.reply(store.history(parse_qs(path.query).get('project_id', [None])[0]))
                 if path.path == '/api/projects':
-                    return self.reply(store.list())
+                    sync_results()
+                    return self.reply(store.list(parse_qs(path.query).get('archived', ['0'])[0] == '1'))
                 if path.path.startswith('/api/projects/'):
-                    return self.reply(store.get(path.path.rsplit('/', 1)[-1]))
+                    return self.reply(store.get(path.path.rsplit('/', 1)[-1], parse_qs(path.query).get('project_id', [None])[0]))
                 if path.path == '/api/state':
                     render_ticket = parse_qs(path.query).get('render_ticket', [None])[0]
                     if render_ticket is not None:
@@ -161,8 +177,20 @@ def serve(port):
                                        'configuration_revision': frame['configuration_revision'],
                                        'samples': samples, 'minimum_coarse_clearance_m': gap,
                                        'note': 'Motion will be checked again on execution; liquid availability is checked at runtime.'})
+                if self.path.startswith('/api/library/'):
+                    if client['principal'] != 'ui': raise MotionError('NOT_AUTHORIZED')
+                    if self.path == '/api/library/standard':
+                        return self.reply(store.get(default['revision']))
+                    if self.path == '/api/library/archive':
+                        return self.reply(store.archive(data.get('project_id'), data.get('archived', True)))
+                    if self.path == '/api/library/restore':
+                        return self.reply(store.restore(data.get('project_id'), data.get('revision'), data.get('expected_revision')))
+                    if self.path == '/api/library/cleanup':
+                        return self.reply(store.archive_custom())
                 if self.path == '/api/projects':
-                    return self.reply(store.save(data.get('name'), data.get('actions')))
+                    return self.reply(store.save(data.get('name'), data.get('actions'),
+                        project_id=data.get('project_id'), expected_revision=data.get('expected_revision'),
+                        new_project=data.get('new_project', False)))
                 if self.path == '/api/control':
                     if client['principal'] != 'ui' and not isinstance(data.get('job_id'), str):
                         raise MotionError('JOB_ID_REQUIRED')
@@ -187,4 +215,6 @@ def serve(port):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8765)
-    serve(parser.parse_args().port)
+    parser.add_argument('--data-dir', type=Path, help='Persistent recipe library directory')
+    args = parser.parse_args()
+    serve(args.port, args.data_dir)

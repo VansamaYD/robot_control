@@ -32,7 +32,7 @@ function tool(name, description, properties, required, execute) {
 }
 tool('get_capabilities', 'Read actual simulator capabilities; hardware and arbitrary Python are unavailable.', {}, [], () => api('/api/capabilities'));
 tool('get_scene', 'Read shared scene geometry and robot model. SI units; simulation only.', {}, [], async () => {
-  const { model, scene } = await api('/api/bootstrap'); return { model, scene };
+  const { model, scene, pour_zones } = await api('/api/bootstrap'); return { model, scene, pour_zones };
 });
 tool('get_robot_state', 'Read latest state, or a historical revision with its incarnation. SI units and explicit source/quality.', { state_revision: integer, incarnation: string }, [], a => {
   if (a.state_revision && !a.incarnation) throw Error('MISSING_ARGUMENT:incarnation');
@@ -65,7 +65,7 @@ function validate(schema, args) {
     if (property.minLength && value.length < property.minLength || property.maxLength && value.length > property.maxLength || property.minimum !== undefined && value < property.minimum || property.maximum !== undefined && value > property.maximum || property.enum && !property.enum.includes(value)) throw Error('INVALID_ARGUMENT:' + key);
   }
 }
-const server = new Server({ name: 'robot-control-simulation', version: '0.17.1' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'robot-control-simulation', version: '0.18.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(t => t.definition) }));
 server.setRequestHandler(CallToolRequestSchema, async request => {
   try {

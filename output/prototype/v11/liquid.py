@@ -15,6 +15,9 @@ class Liquid:
         self.packets = []
         self.capacity = SCENE['ladle']['capacity_m3']
         self.exchange_rate = 0.
+        # Diagnostic cumulative impacts, never another volume-ledger reservoir.
+        self.coverage = {'left': 0., 'center': 0., 'right': 0.}
+        self.hit_bounds = None
 
     @property
     def height(self):
@@ -96,6 +99,15 @@ class Liquid:
                     hit_surface = t
             if hit_chicken is not None and (hit_surface is None or hit_chicken <= hit_surface):
                 self.surface += packet['v']
+                hit = start+(end-start)*hit_chicken
+                x = float(hit[0]-self.geometry.center[0])
+                zone = 'left' if x < -.025 else 'right' if x > .025 else 'center'
+                self.coverage[zone] += packet['v']
+                xy = hit[:2]
+                if self.hit_bounds is None:
+                    self.hit_bounds = [xy.copy(), xy.copy()]
+                else:
+                    self.hit_bounds = [np.minimum(self.hit_bounds[0], xy), np.maximum(self.hit_bounds[1], xy)]
             elif hit_surface is not None:
                 self.pot += packet['v']
             elif end[2] < 0:
@@ -122,4 +134,8 @@ class Liquid:
                 'spill_m3': self.spill, 'initial_m3': self.initial,
                 'balance_error_m3': self.total() - self.initial,
                 'exchange_m3_s': self.exchange_rate,
+                'coverage': {'zone_hit_m3': dict(self.coverage),
+                    'covered_zones': sum(v >= 1e-6 for v in self.coverage.values()),
+                    'bounds_xy_m': [v.tolist() for v in self.hit_bounds] if self.hit_bounds is not None else None,
+                    'model': 'cumulative_impacts_not_wetted_area'},
                 'packets': [{'position_m': p['p'].tolist(), 'volume_m3': p['v']} for p in self.packets]}

@@ -1,0 +1,73 @@
+{
+  "configuration": "S_BASE-geometry-2",
+  "samples": 8640,
+  "minimum_gap_m": 0.007518423004257107,
+  "duration_s": 172.79999999999998,
+  "wall_s": 16.159899915917777,
+  "liquid": {
+    "mode": "uncalibrated_volume_approximation",
+    "height_m": 0.07942527605504328,
+    "capacity_m3": 3.272492347489368e-05,
+    "pot_m3": 0.0020912635761022335,
+    "ladle_m3": 3.272492347489368e-05,
+    "air_m3": 0,
+    "surface_m3": 2.651360225193873e-12,
+    "spill_m3": 0.0,
+    "initial_m3": 0.0021239885022284865,
+    "balance_error_m3": 8.673617379884035e-19,
+    "exchange_m3_s": 0.0,
+    "coverage": {
+      "zone_hit_m3": {
+        "left": 3.2307479042070545e-05,
+        "center": 3.230747917631606e-05,
+        "right": 3.2307479177502033e-05
+      },
+      "covered_zones": 3,
+      "bounds_xy_m": [
+        [
+          -0.056270087184880434,
+          -0.039804720589843676
+        ],
+        [
+          0.05627924003632059,
+          0.04000018578691029
+        ]
+      ],
+      "model": "cumulative_impacts_not_wetted_area"
+    },
+    "packets": []
+  },
+  "zones": [
+    {
+      "key": "left",
+      "label": "左侧",
+      "p": [
+        -0.06,
+        0.04,
+        0.195
+      ],
+      "sign": 1
+    },
+    {
+      "key": "center",
+      "label": "中部",
+      "p": [
+        0.0,
+        0.03,
+        0.195
+      ],
+      "sign": 1
+    },
+    {
+      "key": "right",
+      "label": "右侧",
+      "p": [
+        0.06,
+        0.04,
+        0.195
+      ],
+      "sign": -1
+    }
+  ],
+  "actions_sha256": "caf6fcc1d065710c150f71211b73b1c66e55f747d56b97a8f332ddd57fa82e72"
+}

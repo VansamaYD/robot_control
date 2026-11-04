@@ -5,10 +5,10 @@
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python output/prototype/v11/server.py --port 8765
+.venv/bin/python output/prototype/v11/server.py --port 8765 --data-dir data/library
 ```
 
-需要Python 3.11+。打开 <http://127.0.0.1:8765/>。模型与Three.js已本地保存，启动后无需联网加载资源。服务仅监听本机，流程数据保存到被Git忽略的`data/projects/`。
+需要Python 3.11+。打开 <http://127.0.0.1:8765/>。模型与Three.js已本地保存，启动后无需联网加载资源。服务仅监听本机，流程数据保存到被Git忽略的`data/library/`。
 
 ```sh
 .venv/bin/python -m unittest discover -s output/prototype/v11 -p 'test_*.py' -v
@@ -42,3 +42,5 @@ npm run test:browser
 0.17增加近空停靠转移的有界绕行搜索，固定路线失败后自动尝试。触发条件、搜索预算和案例见[绕行设计与验证](output/design/v10/13-近空转移绕行搜索.md)。
 
 0.17.1修复采样速度超限误报NO_IK，提供[偏移浇汁示例](output/examples/豉油鸡-偏移浇汁验证.json)及[JSON诊断说明](output/design/v10/14-JSON流程与速度误报诊断.md)。
+
+0.18重新整理流程库：编辑只更新一个流程，旧版本在历史中；支持标准恢复、归档及备份。另提供已验证的[左中右三点流程](output/examples/豉油鸡-左中右三点浇汁.json)，说明见[流程库与三点设计](output/design/v10/15-流程库整理与三点浇汁.md)。

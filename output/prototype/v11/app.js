@@ -12,7 +12,9 @@ window.__errors = [];
 
 try {
   const bootstrap = await (await fetch('/api/bootstrap' + (renderTicket ? '?render_ticket=' + encodeURIComponent(renderTicket) : ''))).json();
+  if (!bootstrap.default_program?.project_id) throw new Error('后端仍为旧版，请打开新版工作台或重启服务以加载流程库。');
   let selectedProgram = bootstrap.default_program;
+  let lastLibraryOutcome = null;
   function showCode(code) {
   $('source').replaceChildren();
   code.split('\n').forEach((line, i) => {
@@ -140,6 +142,17 @@ try {
   const trajectory = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x6cf0cd, transparent: true, opacity: .65 }));
   trajectory.visible = false;
   scene.add(trajectory);
+  const targets = new THREE.Group(); scene.add(targets);
+  for (const zone of bootstrap.pour_zones ?? []) {
+    const color = {left:0x59bfff,center:0x7ee7ba,right:0xffba66}[zone.key];
+    const marker = new THREE.Mesh(new THREE.TorusGeometry(.009,.001,8,32),new THREE.MeshBasicMaterial({color}));
+    marker.position.fromArray(zone.p); targets.add(marker);
+    const canvas = document.createElement('canvas'); canvas.width=160; canvas.height=56;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle='#10202ddd'; ctx.fillRect(0,0,160,56);
+    ctx.fillStyle='#e9f4ff'; ctx.font='26px sans-serif'; ctx.textAlign='center'; ctx.fillText(zone.label+'点',80,37);
+    const label = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(canvas),depthTest:false}));
+    label.position.set(zone.p[0],zone.p[1],zone.p[2]+.025); label.scale.set(.055,.019,1); targets.add(label);
+  }
   const history = [];
   let current = null;
   let hold = null;
@@ -208,6 +221,8 @@ try {
       const row = document.createElement('div'), title = document.createElement('span'), value = document.createElement('b');
       title.textContent = label; value.textContent = label === '自然交换' && state.paused ? '暂停' : (amount * 1e6).toFixed(3) + ' ' + unit; row.append(title, value); return row;
     }));
+    const coverage = liquid.coverage;
+    $('coverage').textContent = coverage ? `本次仿真累计命中：左 ${(coverage.zone_hit_m3.left*1e6).toFixed(1)} · 中 ${(coverage.zone_hit_m3.center*1e6).toFixed(1)} · 右 ${(coverage.zone_hit_m3.right*1e6).toFixed(1)} mL（${coverage.covered_zones}/3 区）。这是落点统计，不能等同于整鸡湿润面积；翻鸡后可重复。` : '';
     if (current && current.incarnation !== state.incarnation) {
       history.length = 0;
       $('snapshot-preview').hidden = true; $('snapshot-download').hidden = true;
@@ -243,7 +258,10 @@ try {
     $('cancel').disabled = !busy;
     $('home').disabled = busy && state.status !== 'waiting_operator';
     $('dock').disabled = busy;
-    for (const id of ['project', 'edit', 'save', 'import']) $(id).disabled = busy;
+    for (const id of ['project', 'edit', 'save', 'save-as', 'import', 'standard', 'history', 'cleanup-library', 'show-archived']) $(id).disabled = busy;
+    $('archive-project').disabled = busy || selectedProgram.kind === 'builtin';
+    $('restore-version').disabled = busy || selectedProgram.kind === 'builtin' || selectedProgram.revision === selectedProgram.head_revision;
+    $('run').disabled = busy || selectedProgram.archived || selectedProgram.revision !== selectedProgram.head_revision;
     $('error').textContent = state.job?.error ? describeError(state.job.error, state.job.error_details) : lastCommandError ?? '';
     $('readiness').textContent = state.scoop_readiness?.ready ? '取汁几何就绪；进液由液面接触决定。暂停时不演化，可点击“继续仿真”。' : '取汁前检查：' + describeReason(state.scoop_readiness);
     const progress = state.job?.planning_progress;
@@ -268,7 +286,11 @@ try {
     if (['planning', 'running'].includes(state.job?.status) && !['manual', 'jog', 'recovery'].includes(state.job.origin) && state.job.program_revision !== selectedProgram.revision) {
       const programResponse = await fetch('/api/projects/' + state.job.program_revision);
       if (!programResponse.ok) throw new Error('运行版本不可读取');
-      displayProgram(await programResponse.json());
+      await displayProgram(await programResponse.json());
+    }
+    if (!parameters.has('capture') && ['succeeded','failed'].includes(state.job?.status) && state.job.job_id !== lastLibraryOutcome) {
+      lastLibraryOutcome = state.job.job_id;
+      await refreshProjects(); $('project').value = selectedProgram.head_revision;
     }
     drawState(state);
   }
@@ -308,7 +330,7 @@ try {
         DRAIN_INCOMPLETE: '排汁未达近空条件', DOCK_DRY_INTERLOCK: '离锅近空检查未通过' }[failure.code] ?? failure.code;
       return `已检查 ${details.failures.length} 条候选路线，均未通过；未移动。最后失败：${failure.name}，${reason}。可调整姿态后重试或尝试回取汁位。`;
     }
-    const messages = { PLANNING_TIMEOUT: '规划超过时间预算；未获准执行。可调整姿态后重试。', RECOVERY_PATH_UNAVAILABLE: details?.candidates?.includes('PREDICTED_SPILL') ? '预演发现途中会洒漏，未开始运动。需在锅内处理余汁或重置。' : '没有找到通过检查的恢复路线；未移动。可重置仿真。', DRAIN_INCOMPLETE: '排汁未达近空条件，禁止离锅', DOCK_DRY_INTERLOCK: '近空条件失效，已停止，禁止离锅', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
+    const messages = { PROJECT_NAME_EXISTS: '该名称已被其他流程使用，请改名或另存为新流程。', PROJECT_VERSION_CONFLICT: '流程已被其他页面更新，请重新选择最新版本后编辑。', BUILTIN_READ_ONLY: '内置流程受保护，请保存为你的草稿。', PROJECT_ARCHIVED: '请先从归档恢复此流程。', PLANNING_TIMEOUT: '规划超过时间预算；未获准执行。可调整姿态后重试。', RECOVERY_PATH_UNAVAILABLE: details?.candidates?.includes('PREDICTED_SPILL') ? '预演发现途中会洒漏，未开始运动。需在锅内处理余汁或重置。' : '没有找到通过检查的恢复路线；未移动。可重置仿真。', DRAIN_INCOMPLETE: '排汁未达近空条件，禁止离锅', DOCK_DRY_INTERLOCK: '近空条件失效，已停止，禁止离锅', LIMIT_VIOLATION: '到达关节限位，已停止', COLLISION: '下一步可能碰撞，已停止', CONTROL_BUSY: '已有任务，请先停止当前任务', SESSION_CHANGED: '仿真已重置，请重新操作' };
     return messages[code] ?? code;
   }
   function finiteStep(name, delta) {
@@ -357,36 +379,96 @@ try {
   window.addEventListener('blur', () => finishHold('blur', false));
   window.addEventListener('pagehide', () => finishHold('pagehide', false));
   document.addEventListener('visibilitychange', () => { if (document.hidden) finishHold('hidden', false); });
-  function displayProgram(program) {
+  const statusName = value => ({offline_checked:'离线验证通过',succeeded:'上次运行完成',failed:'上次运行失败',unverified:'未运行草稿'}[value] ?? value);
+  function projectLabel(record) {
+    return `${record.archived ? '已归档 · ' : ''}${record.kind === 'builtin' ? '内置 · ' : ''}${record.name} · v${record.version_number} · ${statusName(record.validation_status)}`;
+  }
+  async function displayProgram(program) {
     selectedProgram = program;
-    if (![...$('project').options].some(option => option.value === program.revision)) {
-      const option = document.createElement('option'); option.value = program.revision;
-      option.textContent = `${program.name} · ${program.revision.slice(0, 8)}`; $('project').append(option);
-    }
     showCode(program.code);
-    $('program-revision').textContent = program.revision.slice(0, 12);
+    $('program-revision').textContent = `v${program.version_number ?? 1} / ${program.revision.slice(0, 8)}`;
     $('project-name').value = program.name;
     $('recipe').value = JSON.stringify(program.actions, null, 2);
-    $('project').value = program.revision;
+    $('project').value = program.head_revision ?? program.revision;
+    $('save').textContent = program.kind === 'builtin' ? '保存为我的流程' : '保存当前流程';
+    $('archive-project').textContent = program.archived ? '恢复到列表' : '归档流程';
+    $('project-info').textContent = `${program.kind === 'builtin' ? '内置流程受保护；编辑后保存为草稿。' : '编辑只更新这一个流程，旧版本在下方历史中。'} ${program.revision !== program.head_revision ? '正在查看历史版本；恢复后才能运行。' : ''} ${statusName(program.validation_status)}`;
+    const response = await fetch('/api/library/history?project_id='+encodeURIComponent(program.project_id));
+    if (!response.ok) throw new Error('版本历史读取失败');
+    const history = await response.json();
+    if (selectedProgram.revision !== program.revision) return;
+    $('history').replaceChildren(...history.map(record => {
+      const option = document.createElement('option'); option.value = record.revision;
+      option.textContent = `v${record.version_number}${record.current ? '（当前）' : ''} · ${statusName(record.validation_status)}`;
+      return option;
+    }));
+    $('history').value = program.revision;
   }
   async function refreshProjects() {
-    const projects = await (await fetch('/api/projects')).json();
+    const projects = await (await fetch('/api/projects'+($('show-archived').checked ? '?archived=1' : ''))).json();
     $('project').replaceChildren(...projects.map(record => {
       const option = document.createElement('option'); option.value = record.revision;
-      option.textContent = `${record.name} · ${record.revision.slice(0, 8)}`; return option;
+      option.textContent = projectLabel(record); return option;
     }));
+    return projects;
   }
-  await refreshProjects(); displayProgram(selectedProgram);
+  async function standardProgram() {
+    await refreshProjects();
+    await displayProgram(await post('/api/library/standard', {}));
+    $('editor').hidden = true;
+    $('library-message').textContent = '已恢复标准流程；机械臂姿态和汤汁未重置。';
+  }
+  await refreshProjects(); await displayProgram(selectedProgram);
   $('project').onchange = act(async () => {
     const response = await fetch('/api/projects/' + $('project').value);
-    if (!response.ok) throw new Error('流程版本读取失败');
-    displayProgram(await response.json()); $('editor').hidden = true;
+    if (!response.ok) throw new Error('流程读取失败');
+    await displayProgram(await response.json()); $('editor').hidden = true;
+  });
+  $('history').onchange = act(async () => {
+    await displayProgram(await (await fetch('/api/projects/'+$('history').value+'?project_id='+encodeURIComponent(selectedProgram.project_id))).json());
+  });
+  $('standard').onclick = act(standardProgram);
+  $('show-archived').onchange = act(async () => {
+    const projects = await refreshProjects();
+    const current = projects.find(p => p.project_id === selectedProgram.project_id);
+    if (current) await displayProgram(await (await fetch('/api/projects/'+current.revision)).json());
+    else await standardProgram();
+  });
+  $('restore-version').onclick = act(async () => {
+    const program = await post('/api/library/restore', {project_id:selectedProgram.project_id,revision:selectedProgram.revision,expected_revision:selectedProgram.head_revision});
+    await refreshProjects(); await displayProgram(program);
+    $('library-message').textContent = '已恢复选中版本；其他版本仍保留。';
+  });
+  $('archive-project').onclick = act(async () => {
+    const archived = !selectedProgram.archived;
+    await post('/api/library/archive', {project_id:selectedProgram.project_id,archived});
+    await standardProgram();
+    $('library-message').textContent = archived ? '已归档，可勾选“显示已归档”恢复。' : '流程已恢复到列表。';
+  });
+  $('cleanup-library').onclick = act(async () => {
+    const result = await post('/api/library/cleanup', {});
+    $('show-archived').checked = false;
+    await standardProgram();
+    $('library-message').textContent = `已备份并归档 ${result.archived_projects} 个草稿；内置流程保留。`;
+  });
+  $('backup-library').onclick = act(async () => {
+    const record = await (await fetch('/api/library/export')).json();
+    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([JSON.stringify(record,null,2)],{type:'application/json'}));
+    link.download = 'robot-recipe-library-backup.json'; link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
   });
   $('edit').onclick = () => { $('editor').hidden = !$('editor').hidden; };
-  $('save').onclick = act(async () => {
-    const program = await post('/api/projects', { name: $('project-name').value, actions: JSON.parse($('recipe').value) });
-    await refreshProjects(); displayProgram(program); $('editor').hidden = true;
-  });
+  async function saveProgram(copy) {
+    let name = $('project-name').value;
+    const fork = copy || selectedProgram.kind === 'builtin' || selectedProgram.archived;
+    if (fork && name === selectedProgram.name) name += copy ? '（副本）' : '（我的修改）';
+    const program = await post('/api/projects', {name, actions:JSON.parse($('recipe').value),
+      ...(fork ? {new_project:copy} : {project_id:selectedProgram.project_id,expected_revision:selectedProgram.head_revision})});
+    await refreshProjects(); await displayProgram(program); $('editor').hidden = true;
+    $('library-message').textContent = `已保存 v${program.version_number}，旧版本保留在历史中。`;
+  }
+  $('save').onclick = act(()=>saveProgram(false));
+  $('save-as').onclick = act(()=>saveProgram(true));
   $('export').onclick = () => {
     const blob = new Blob([JSON.stringify(selectedProgram, null, 2)], { type: 'application/json' });
     const link = document.createElement('a'); link.href = URL.createObjectURL(blob);
@@ -399,13 +481,16 @@ try {
     if (file.size > 65536) throw new Error('流程文件不能超过 64KiB');
     const record = JSON.parse(await file.text());
     if (record.schema_version !== '1.0') throw new Error('不支持的流程版本');
-    const program = await post('/api/projects', { name: record.name, actions: record.actions });
-    await refreshProjects(); displayProgram(program); $('import-file').value = '';
+    const program = await post('/api/projects', { name: record.name, actions: record.actions, new_project: true });
+    await refreshProjects(); await displayProgram(program); $('import-file').value = '';
   });
   $('run').onclick = act(() => {
     $('editor').hidden = true;
     return post('/api/run', { idempotency_key: crypto.randomUUID(), program_revision: selectedProgram.revision });
   });
+  $('targets').onclick = () => {
+    targets.visible = !targets.visible; $('targets').textContent = targets.visible ? '隐藏三点参考' : '显示三点参考';
+  };
   $('trace').onclick = () => {
     trajectory.visible = !trajectory.visible;
     $('trace').textContent = trajectory.visible ? '隐藏轨迹' : '显示轨迹';

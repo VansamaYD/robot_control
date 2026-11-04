@@ -1,0 +1,29 @@
+{
+  "status": "passed",
+  "tests": [
+    {
+      "name": "protected_standard_reset_changes_only_recipe",
+      "status": "passed"
+    },
+    {
+      "name": "edits_update_one_project_with_immutable_history",
+      "status": "passed"
+    },
+    {
+      "name": "history_preview_requires_restore_and_keeps_other_versions",
+      "status": "passed"
+    },
+    {
+      "name": "archive_is_reversible_without_deleting_revisions",
+      "status": "passed"
+    },
+    {
+      "name": "cleanup_preserves_builtin_recipes_and_exports_full_backup",
+      "status": "passed"
+    },
+    {
+      "name": "three_zone_recipe_runs_and_reports_all_impacts",
+      "status": "passed"
+    }
+  ]
+}

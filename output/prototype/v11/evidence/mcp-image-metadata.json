@@ -1,9 +1,9 @@
 {
   "session_id": "local-v11",
-  "incarnation": "boot-973351906090916",
-  "state_revision": 5,
-  "tick": 0,
-  "simulation_time_s": 0,
+  "incarnation": "boot-2e8d747a8396401daa2e279a52b67f47",
+  "state_revision": 10,
+  "tick": 5,
+  "simulation_time_s": 0.1,
   "configuration_revision": "S_BASE-geometry-2",
   "source": "simulation",
   "q_rad": [
@@ -15,16 +15,26 @@
   ],
   "liquid": {
     "mode": "uncalibrated_volume_approximation",
-    "height_m": 0.08,
+    "height_m": 0.07985992241893694,
     "capacity_m3": 0.00003272492347489368,
-    "pot_m3": 0.0021239885022284865,
-    "ladle_m3": 0,
+    "pot_m3": 0.0021159885022284863,
+    "ladle_m3": 0.000008000000000000001,
     "air_m3": 0,
     "surface_m3": 0,
     "spill_m3": 0,
     "initial_m3": 0.0021239885022284865,
     "balance_error_m3": 0,
-    "exchange_m3_s": 0,
+    "exchange_m3_s": 0.00008,
+    "coverage": {
+      "zone_hit_m3": {
+        "left": 0,
+        "center": 0,
+        "right": 0
+      },
+      "covered_zones": 0,
+      "bounds_xy_m": null,
+      "model": "cumulative_impacts_not_wetted_area"
+    },
     "packets": []
   },
   "camera": {
@@ -47,5 +57,5 @@
   },
   "width": 1280,
   "height": 720,
-  "image_sha256": "e88c85acfe7a46aa555d8e798b68d7cc537012f7c7659ac76a6185a7974a2f52"
+  "image_sha256": "0006b1475a062ee52da1b47653841b45bfb94ae50463f5526b3b87de0e9046a1"
 }

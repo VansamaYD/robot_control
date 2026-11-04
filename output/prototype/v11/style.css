@@ -7,3 +7,5 @@
 #readiness{font-size:11px;color:#b2c4d0;line-height:1.6;margin-bottom:18px}dialog{max-width:480px;border:1px solid #456078;border-radius:8px;background:#172331;color:#deebf3;padding:24px}dialog::backdrop{background:#0009}dialog h2{font-size:18px}dialog p{font-size:13px;line-height:1.8}#joints button{touch-action:none;user-select:none}.recovery{border-top:1px solid #2b3947;padding-top:12px}
 
 #planning-info{font-size:11px;color:#94baa8;line-height:1.6;margin:0 0 16px}
+
+.library-note{font-size:11px;color:#9ab0c2;line-height:1.7;margin:7px 0}#history{max-width:210px;flex:1}#library-message{color:#8de8cc}#coverage{padding:10px;border:1px solid #34564f;border-radius:5px;margin-bottom:20px}#show-archived{vertical-align:middle}
