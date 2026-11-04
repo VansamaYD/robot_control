@@ -27,7 +27,7 @@ class Renderer:
     def render(self, revision, width=1280, height=720, view='default', incarnation=None):
         if incarnation != self.engine.incarnation:
             raise MotionError('SESSION_CHANGED')
-        if type(revision) is not int or type(width) is not int or type(height) is not int or not 320 <= width <= 1920 or not 240 <= height <= 1080 or view not in ('default', 'top', 'side'):
+        if type(revision) is not int or type(width) is not int or type(height) is not int or not 320 <= width <= 1920 or not 240 <= height <= 1080 or view not in ('default', 'top', 'side', 'rack'):
             raise MotionError('INVALID_ARGUMENT')
         if not self.slots.acquire(blocking=False):
             raise MotionError('RENDER_BUSY')

@@ -1,7 +1,7 @@
 {
   "name": "robot-control-workbench",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.19.0",
   "type": "module",
   "scripts": {
     "test:browser": "node output/prototype/v11/verify_browser.cjs",
@@ -10,7 +10,8 @@
     "test:recovery": "node output/prototype/v11/verify_recovery.mjs",
     "test:planning-ui": "node output/prototype/v11/verify_planning_ui.mjs",
     "benchmark:ik": "python3 output/prototype/v11/benchmark_ik.py",
-    "test:library": "node output/prototype/v11/verify_library.mjs"
+    "test:library": "node output/prototype/v11/verify_library.mjs",
+    "test:rack": "node output/prototype/v11/verify_rack.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

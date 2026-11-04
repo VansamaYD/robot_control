@@ -1,4 +1,4 @@
-"""Same sampled envelopes as v03, batched without removing collision samples."""
+"""Validated compound chicken/rack inside the unchanged v03 envelope."""
 import numpy as np
 from arm_model import fk
 from trajectory_sim import BASE, CONFIG, pot_distance, chicken_distance, samples

@@ -21,11 +21,11 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / 'v03'))
 import arm_model as arm
-from trajectory_sim import BASE, CONFIG as LEGACY_CONFIG
+from trajectory_sim import BASE
 from collision_model import clearance
 from flow import main
 from liquid import Liquid
-from scene_geometry import SCENE
+from scene_geometry import SCENE, validate_scene
 from projects import code_view
 from errors import MotionError
 import ik_solver
@@ -42,11 +42,10 @@ def vector(node, name, default='0 0 0'):
 
 
 def load_model():
-    if (SCENE['pot']['radius_m'] * 2000 != LEGACY_CONFIG['pot_diameter_mm']
-            or SCENE['pot']['depth_m'] * 1000 != LEGACY_CONFIG['pot_depth_mm']
-            or SCENE['chicken']['center_m'][1] * 1000 != 50
-            or SCENE['chicken']['radii_m'] != [.13, .09, .075]):
-        raise MotionError('COLLISION_GEOMETRY_NOT_SUPPORTED')
+    try:
+        validate_scene()
+    except ValueError as error:
+        raise MotionError(str(error)) from error
     tree = ET.parse(ROOT / 'assets/so101_new_calib.urdf').getroot()
     joints = []
     for joint in tree.findall('joint'):

@@ -121,8 +121,9 @@ class RevisionStore:
 
 class ProjectStore(RevisionStore):
     """One visible head per project; immutable revisions remain addressable."""
-    def __init__(self, directory):
+    def __init__(self, directory, configuration=None):
         super().__init__(directory)
+        self.configuration = configuration
         self.lock = threading.RLock()
         self.index_path = self.directory/'library.index'
         if not self.index_path.exists():
@@ -157,12 +158,13 @@ class ProjectStore(RevisionStore):
 
     def _decorate(self, record, entry, index):
         result = index['results'].get(record['revision'])
+        current_result = result and (self.configuration is None or result.get('configuration') == self.configuration)
         return {**record, 'project_id': entry['project_id'], 'kind': entry['kind'],
             'archived': entry['archived'], 'head_revision': entry['revision'],
             'version_number': entry['history'].index(record['revision'])+1,
             'version_count': len(entry['history']), 'builtin_key': entry.get('builtin_key'),
-            'validation_status': result['status'] if result else
-                'offline_checked' if entry['kind']=='builtin' else 'unverified',
+            'validation_status': result['status'] if current_result else
+                'offline_checked' if entry['kind']=='builtin' else 'previous_scene' if result else 'unverified',
             'last_result': result}
 
     def get(self, revision, project_id=None):
@@ -285,11 +287,11 @@ class ProjectStore(RevisionStore):
             self._write(index)
             return {'archived_projects': count, 'backup_file': str(target)}
 
-    def note_result(self, revision, job_id, status, error=None):
+    def note_result(self, revision, job_id, status, error=None, configuration=None):
         if status not in ('succeeded','failed'): return
         with self.lock:
             index = self._read()
             if not any(revision in e['history'] for e in index['projects'].values()): return
             if index['results'].get(revision, {}).get('job_id') == job_id: return
-            index['results'][revision] = {'job_id': job_id, 'status': status, 'error': error}
+            index['results'][revision] = {'job_id': job_id, 'status': status, 'error': error, 'configuration': configuration}
             self._write(index)

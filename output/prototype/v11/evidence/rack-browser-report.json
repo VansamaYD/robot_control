@@ -1,0 +1,22 @@
+{
+  "status": "passed",
+  "tests": [
+    {
+      "name": "rack_geometry_above_80mm_liquid",
+      "status": "passed"
+    },
+    {
+      "name": "surface_flow_and_airborne_return_exist_together",
+      "status": "passed"
+    },
+    {
+      "name": "pinned_rack_view_renders_without_advancing_fluid",
+      "status": "passed"
+    },
+    {
+      "name": "unchanged_standard_completes_and_recovers_liquid_without_spill",
+      "status": "passed",
+      "returned_ml": 32.30747814175537
+    }
+  ]
+}

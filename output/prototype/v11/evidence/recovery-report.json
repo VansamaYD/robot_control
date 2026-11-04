@@ -5,7 +5,7 @@
       "name": "explicit_reset_restores_pose_liquid_time_but_keeps_programs",
       "status": "passed",
       "details": {
-        "incarnation": "boot-80c09d086349475babb4ed5b09d51f6f"
+        "incarnation": "boot-ea388e0368c84a05989010a4a908f7a8"
       }
     },
     {
@@ -69,7 +69,7 @@
       "name": "initially_empty_dock_still_drains_natural_inlet_before_exit",
       "status": "passed",
       "details": {
-        "planning_wall_s": 6.02063954109326,
+        "planning_wall_s": 4.697088084067218,
         "planned_duration_s": 55.300000000000004,
         "remaining_ml": 0.0007099116211581438
       }

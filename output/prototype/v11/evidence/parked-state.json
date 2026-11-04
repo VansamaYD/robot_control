@@ -1,12 +1,12 @@
 {
   "session_id": "local-v11",
-  "incarnation": "boot-fdf0879c2c6e4323b6da855c5babbc88",
-  "state_revision": 3451,
-  "configuration_revision": "S_BASE-geometry-2",
-  "tick": 3397,
+  "incarnation": "boot-01f2758d022c4fb88ce3d4c85d954be2",
+  "state_revision": 3453,
+  "configuration_revision": "S_RACK-geometry-3",
+  "tick": 3399,
   "action_tick": 3392,
   "dt_s": 0.02,
-  "simulation_time_s": 67.94,
+  "simulation_time_s": 67.98,
   "source": "simulation",
   "quality": "ideal_kinematics",
   "q_rad": [
@@ -204,7 +204,7 @@
   "paused": true,
   "status": "waiting_operator",
   "job": {
-    "job_id": "run-c9f3289926564588a943dec96fab24be",
+    "job_id": "run-c25e551d35b34e84b8970786ea478616",
     "status": "waiting_operator",
     "code_hash": "e9c0eea34f1f3e3f27f4d96fe62e6ea966741881415a5a01a5cebb383e03af16",
     "principal": "ui",
@@ -225,29 +225,43 @@
       ],
       "liquid": {
         "mode": "uncalibrated_volume_approximation",
-        "height_m": 0.0794252761018709,
+        "height_m": 0.079650130433914,
         "capacity_m3": 0.00003272492347489368,
-        "pot_m3": 0.0020912635787535922,
+        "pot_m3": 0.003981996750312036,
         "ladle_m3": 0.00003272492347489368,
         "air_m3": 0,
         "surface_m3": 0,
         "spill_m3": 0,
-        "initial_m3": 0.0021239885022284865,
-        "balance_error_m3": -4.336808689942018e-19,
+        "initial_m3": 0.0040147216737869305,
+        "balance_error_m3": -8.673617379884035e-19,
         "exchange_m3_s": 0,
+        "coverage": {
+          "zone_hit_m3": {
+            "left": 0,
+            "center": 0,
+            "right": 0
+          },
+          "covered_zones": 0,
+          "bounds_xy_m": null,
+          "model": "cumulative_impacts_not_wetted_area"
+        },
+        "returned_m3": 0,
+        "return_air_m3": 0,
+        "surface_packets": [],
         "packets": []
       },
-      "configuration": "S_BASE-geometry-2",
-      "incarnation": "boot-fdf0879c2c6e4323b6da855c5babbc88"
+      "configuration": "S_RACK-geometry-3",
+      "incarnation": "boot-01f2758d022c4fb88ce3d4c85d954be2"
     },
     "planning_progress": {
       "candidate": 1,
       "segment": 10,
       "segments": 10,
       "name": "进入翻鸡停靠点",
-      "elapsed_s": 4.944802499958314
+      "stage": "fixed",
+      "elapsed_s": 4.707089375006035
     },
-    "planning_wall_s": 5.394420207943767,
+    "planning_wall_s": 5.106658416101709,
     "planned_duration_s": 55.300000000000004,
     "predicted_spill_increment_m3": 0,
     "planned_samples": 2765,
@@ -257,7 +271,7 @@
       "ik_iterations": 6954
     },
     "dry_check": {
-      "tick": 1896,
+      "tick": 1897,
       "tcp_m": [
         -6.142762687399994e-11,
         -0.10000000005993837,
@@ -295,16 +309,29 @@
   },
   "liquid": {
     "mode": "uncalibrated_volume_approximation",
-    "height_m": 0.07999998756966231,
+    "height_m": 0.07999999241551564,
     "capacity_m3": 0.00003272492347489368,
-    "pot_m3": 0.0021239877923168735,
+    "pot_m3": 0.004014720963875301,
     "ladle_m3": 7.099116211581438e-10,
     "air_m3": 0,
     "surface_m3": 0,
     "spill_m3": 0,
-    "initial_m3": 0.0021239885022284865,
-    "balance_error_m3": 8.239936510889834e-18,
+    "initial_m3": 0.0040147216737869305,
+    "balance_error_m3": -8.673617379884035e-18,
     "exchange_m3_s": 0,
+    "coverage": {
+      "zone_hit_m3": {
+        "left": 0,
+        "center": 0,
+        "right": 0
+      },
+      "covered_zones": 0,
+      "bounds_xy_m": null,
+      "model": "cumulative_impacts_not_wetted_area"
+    },
+    "returned_m3": 0,
+    "return_air_m3": 0,
+    "surface_packets": [],
     "packets": []
   },
   "scoop_readiness": {
@@ -316,8 +343,8 @@
       -0.300000000000166,
       0.19500003101857308
     ],
-    "liquid_height_m": 0.07999998756966231,
-    "pot_m3": 0.0021239877923168735,
+    "liquid_height_m": 0.07999999241551564,
+    "pot_m3": 0.004014720963875301,
     "ladle_m3": 7.099116211581438e-10,
     "requested_m3": 0.00003,
     "geometric_capacity_m3": 0,

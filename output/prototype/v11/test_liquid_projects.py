@@ -46,7 +46,7 @@ class GeometryAndLiquidTests(unittest.TestCase):
         self.assertEqual(liquid.ladle, 0)
 
     def test_above_surface_or_blocked_cannot_scoop(self):
-        for point in [[0, -.1, .3], [0, .05, .075], [1, 0, .075]]:
+        for point in [[0, -.1, .3], [0, .05, .120], [1, 0, .075]]:
             liquid = self.liquid()
             liquid.advance(.02, point, [0, 0, 1], 30e-6)
             self.assertEqual(liquid.ladle, 0)

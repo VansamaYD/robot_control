@@ -1,6 +1,7 @@
 // Mutating acceptance tests: run only against a dedicated service/library.
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +54,14 @@ try{
  });
  await check('cleanup_preserves_builtin_recipes_and_exports_full_backup',async()=>{
   const download=page.waitForEvent('download');await page.click('#backup-library');const file=await download;
-  const record=JSON.parse(fs.readFileSync(await file.path(),'utf8'));assert.equal(record.schema_version,'library-backup-1');assert(record.records.some(r=>r.revision===first));
+  const backupPath=await file.path();
+  execFileSync('python3',['-c',`import json,hashlib,sys
+b=json.load(open(sys.argv[1]))
+for r in b['records']:
+ c=json.dumps({k:r[k] for k in ['schema_version','name','actions']},sort_keys=True,ensure_ascii=False,separators=(',',':'),allow_nan=False)
+ assert hashlib.sha256(c.encode()).hexdigest()==r['revision'],r['name']
+`,backupPath]);
+  const record=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.equal(record.schema_version,'library-backup-1');assert(record.records.some(r=>r.revision===first));
   await page.click('#cleanup-library');await page.waitForFunction(()=>document.getElementById('library-message').textContent.includes('已备份并归档'));
   const active=await list();assert.equal(active.length,2);assert(active.every(r=>r.kind==='builtin'));assert(active.some(r=>r.action_count===24));
   const after=await state();assert.deepEqual(after.q_rad,initial.q_rad);assert.deepEqual(after.liquid,initial.liquid);

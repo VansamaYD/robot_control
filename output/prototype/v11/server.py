@@ -15,7 +15,7 @@ from recipe_library import three_zone_actions, THREE_ZONES
 
 
 def serve(port, data_dir=None):
-    store = ProjectStore(Path(data_dir) if data_dir else ROOT.parents[2] / 'data/projects')
+    store = ProjectStore(Path(data_dir) if data_dir else ROOT.parents[2] / 'data/projects', configuration=SCENE['revision'])
     default = store.save('标准流程 · 单点浇汁', [{k: v for k, v in action.items() if k != 'source_line'} for action in main(Robot())], builtin_key='standard')
     store.save('左中右三点浇汁', three_zone_actions(), builtin_key='three-zone')
     engine = Engine(default_program=default)
@@ -29,7 +29,7 @@ def serve(port, data_dir=None):
             completed = {j.get('program_revision'): dict(j) for j in engine.jobs.values()
                          if j['status'] in ('succeeded', 'failed') and j.get('origin') != 'recovery'}
         for revision, job in completed.items():
-            store.note_result(revision, job['job_id'], job['status'], job.get('error'))
+            store.note_result(revision, job['job_id'], job['status'], job.get('error'), configuration=engine.config)
 
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -64,11 +64,11 @@ def serve(port, data_dir=None):
                                        'model': engine.model, 'scene': SCENE, 'default_program': default,
                                        'projects': store.list(), 'pour_zones': THREE_ZONES, 'dt_s': .02})
                 if path.path == '/api/capabilities':
-                    return self.reply({'version': '0.18.0', 'mode': 'simulation', 'mcp_stdio': True,
+                    return self.reply({'version': '0.19.0', 'mode': 'simulation', 'mcp_stdio': True,
                                        'render_snapshot': True, 'manual_joint_steps': True,
                                        'leased_jog': True, 'recovery_presets': True,
                                        'natural_liquid_exchange': True, 'dock_dry_interlock': True,
-                                       'project_history': True, 'standard_recipe': True, 'three_zone_coverage': True,
+                                       'raised_chicken': True, 'visible_runoff': True, 'project_history': True, 'standard_recipe': True, 'three_zone_coverage': True,
                                        'dry_dock_detour': True, 'detour_scope': 'verified_dry_dock_transfer',
                                        'arbitrary_python': False, 'hardware': False, 'vision': False})
                 if path.path == '/api/library/export':

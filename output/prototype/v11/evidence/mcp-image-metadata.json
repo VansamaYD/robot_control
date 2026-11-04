@@ -1,10 +1,10 @@
 {
   "session_id": "local-v11",
-  "incarnation": "boot-2e8d747a8396401daa2e279a52b67f47",
-  "state_revision": 10,
-  "tick": 5,
-  "simulation_time_s": 0.1,
-  "configuration_revision": "S_BASE-geometry-2",
+  "incarnation": "boot-100fabf0c5174deeb60cefb78220fbfe",
+  "state_revision": 5,
+  "tick": 1,
+  "simulation_time_s": 0.02,
+  "configuration_revision": "S_RACK-geometry-3",
   "source": "simulation",
   "q_rad": [
     -0.0006736970912698113,
@@ -15,14 +15,14 @@
   ],
   "liquid": {
     "mode": "uncalibrated_volume_approximation",
-    "height_m": 0.07985992241893694,
+    "height_m": 0.07998290607665708,
     "capacity_m3": 0.00003272492347489368,
-    "pot_m3": 0.0021159885022284863,
-    "ladle_m3": 0.000008000000000000001,
+    "pot_m3": 0.0040131216737869305,
+    "ladle_m3": 0.0000016000000000000001,
     "air_m3": 0,
     "surface_m3": 0,
     "spill_m3": 0,
-    "initial_m3": 0.0021239885022284865,
+    "initial_m3": 0.0040147216737869305,
     "balance_error_m3": 0,
     "exchange_m3_s": 0.00008,
     "coverage": {
@@ -35,6 +35,9 @@
       "bounds_xy_m": null,
       "model": "cumulative_impacts_not_wetted_area"
     },
+    "returned_m3": 0,
+    "return_air_m3": 0,
+    "surface_packets": [],
     "packets": []
   },
   "camera": {
@@ -57,5 +60,5 @@
   },
   "width": 1280,
   "height": 720,
-  "image_sha256": "0006b1475a062ee52da1b47653841b45bfb94ae50463f5526b3b87de0e9046a1"
+  "image_sha256": "96d7126b4a6a4ac4a2e7e9697ff48fcc61cb57b69627b7ed3cda766815ff5fb9"
 }

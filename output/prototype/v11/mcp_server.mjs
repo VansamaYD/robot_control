@@ -50,7 +50,7 @@ for (const command of ['cancel', 'pause', 'resume']) {
   tool(command + '_job', command + ' a job owned by this MCP adapter. A stale job ID cannot affect a newer job.', { job_id: string }, ['job_id'], a => write('/api/control', { job_id: a.job_id, command }));
 }
 tool('render_snapshot', 'Render a pinned historical snapshot as PNG using a separate headless browser. Does not advance simulation or change the UI camera.', {
-  state_revision: integer, incarnation: string, view: { type: 'string', enum: ['default', 'top', 'side'] },
+  state_revision: integer, incarnation: string, view: { type: 'string', enum: ['default', 'top', 'side', 'rack'] },
   width: { type: 'integer', minimum: 320, maximum: 1920 }, height: { type: 'integer', minimum: 240, maximum: 1080 }
 }, ['state_revision', 'incarnation'], a => write('/api/images', a));
 
@@ -65,7 +65,7 @@ function validate(schema, args) {
     if (property.minLength && value.length < property.minLength || property.maxLength && value.length > property.maxLength || property.minimum !== undefined && value < property.minimum || property.maximum !== undefined && value > property.maximum || property.enum && !property.enum.includes(value)) throw Error('INVALID_ARGUMENT:' + key);
   }
 }
-const server = new Server({ name: 'robot-control-simulation', version: '0.18.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'robot-control-simulation', version: '0.19.0' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: tools.map(t => t.definition) }));
 server.setRequestHandler(CallToolRequestSchema, async request => {
   try {

@@ -5,10 +5,10 @@
 ```sh
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python output/prototype/v11/server.py --port 8765 --data-dir data/library
+.venv/bin/python output/prototype/v11/server.py --port 8765 --data-dir data/rack-library
 ```
 
-需要Python 3.11+。打开 <http://127.0.0.1:8765/>。模型与Three.js已本地保存，启动后无需联网加载资源。服务仅监听本机，流程数据保存到被Git忽略的`data/library/`。
+需要Python 3.11+。打开 <http://127.0.0.1:8765/>。模型与Three.js已本地保存，启动后无需联网加载资源。服务仅监听本机，流程数据保存到被Git忽略的`data/rack-library/`。
 
 ```sh
 .venv/bin/python -m unittest discover -s output/prototype/v11 -p 'test_*.py' -v
@@ -44,3 +44,5 @@ npm run test:browser
 0.17.1修复采样速度超限误报NO_IK，提供[偏移浇汁示例](output/examples/豉油鸡-偏移浇汁验证.json)及[JSON诊断说明](output/design/v10/14-JSON流程与速度误报诊断.md)。
 
 0.18重新整理流程库：编辑只更新一个流程，旧版本在历史中；支持标准恢复、归档及备份。另提供已验证的[左中右三点流程](output/examples/豉油鸡-左中右三点浇汁.json)，说明见[流程库与三点设计](output/design/v10/15-流程库整理与三点浇汁.md)。
+
+0.19将鸡放在镂空架上，液面保持80mm，原路线不变；展示表面流动、滴落回锅与再次取汁。可点击“近看回流”，设计及验证见[架上鸡体与可见回流](output/design/v10/16-架上鸡体与可见回流.md)。

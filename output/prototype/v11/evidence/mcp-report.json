@@ -31,16 +31,16 @@
       "name": "shared_job_idempotency_owner_and_pause",
       "status": "passed",
       "details": {
-        "job_id": "run-6223ca9c88b144529668b13b5bd4268e"
+        "job_id": "run-1d6dff51a3ca43f2a9db2854d9aa0029"
       }
     },
     {
       "name": "render_real_png_at_pinned_state",
       "status": "passed",
       "details": {
-        "bytes": 114162,
-        "state_revision": 10,
-        "image_sha256": "0006b1475a062ee52da1b47653841b45bfb94ae50463f5526b3b87de0e9046a1"
+        "bytes": 111766,
+        "state_revision": 5,
+        "image_sha256": "96d7126b4a6a4ac4a2e7e9697ff48fcc61cb57b69627b7ed3cda766815ff5fb9"
       }
     },
     {

@@ -2,14 +2,14 @@
   {
     "seq": 1,
     "tick": 0,
-    "incarnation": "boot-1016973995032375",
+    "incarnation": "boot-1025027333629833",
     "event": "job_created",
-    "job_id": "run-b274b1c203084beaac0879f9c87441e7"
+    "job_id": "run-f95c1b46f65449a4806573b8a542dbc6"
   },
   {
     "seq": 2,
-    "tick": 7,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "等待自然取汁 ≥30mL",
     "line": 3,
@@ -17,15 +17,15 @@
   },
   {
     "seq": 3,
-    "tick": 42,
-    "incarnation": "boot-1016973995032375",
+    "tick": 36,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "等待自然取汁 ≥30mL"
   },
   {
     "seq": 4,
-    "tick": 645,
-    "incarnation": "boot-1016973995032375",
+    "tick": 245,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "提勺",
     "line": 4,
@@ -33,15 +33,15 @@
   },
   {
     "seq": 5,
-    "tick": 1255,
-    "incarnation": "boot-1016973995032375",
+    "tick": 855,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "提勺"
   },
   {
     "seq": 6,
-    "tick": 1893,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1100,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "移到鸡背上方",
     "line": 5,
@@ -49,15 +49,15 @@
   },
   {
     "seq": 7,
-    "tick": 2218,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1425,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "移到鸡背上方"
   },
   {
     "seq": 8,
-    "tick": 2693,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1653,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "倾斜汤勺 65°",
     "line": 6,
@@ -65,15 +65,15 @@
   },
   {
     "seq": 9,
-    "tick": 2943,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1903,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "倾斜汤勺 65°"
   },
   {
     "seq": 10,
-    "tick": 2947,
-    "incarnation": "boot-1016973995032375",
+    "tick": 1905,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "保持倾角淋汁",
     "line": 7,
@@ -81,15 +81,15 @@
   },
   {
     "seq": 11,
-    "tick": 3072,
-    "incarnation": "boot-1016973995032375",
+    "tick": 2030,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "保持倾角淋汁"
   },
   {
     "seq": 12,
-    "tick": 3411,
-    "incarnation": "boot-1016973995032375",
+    "tick": 2169,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "汤勺回正",
     "line": 8,
@@ -97,15 +97,15 @@
   },
   {
     "seq": 13,
-    "tick": 3611,
-    "incarnation": "boot-1016973995032375",
+    "tick": 2369,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "汤勺回正"
   },
   {
     "seq": 14,
-    "tick": 4192,
-    "incarnation": "boot-1016973995032375",
+    "tick": 2604,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "返回取汁上方",
     "line": 9,
@@ -113,15 +113,15 @@
   },
   {
     "seq": 15,
-    "tick": 4517,
-    "incarnation": "boot-1016973995032375",
+    "tick": 2929,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "返回取汁上方"
   },
   {
     "seq": 16,
-    "tick": 5589,
-    "incarnation": "boot-1016973995032375",
+    "tick": 3362,
+    "incarnation": "boot-1025027333629833",
     "event": "action_started",
     "name": "下降到取汁点",
     "line": 10,
@@ -129,15 +129,15 @@
   },
   {
     "seq": 17,
-    "tick": 6199,
-    "incarnation": "boot-1016973995032375",
+    "tick": 3972,
+    "incarnation": "boot-1025027333629833",
     "event": "action_completed",
     "name": "下降到取汁点"
   },
   {
     "seq": 18,
-    "tick": 6200,
-    "incarnation": "boot-1016973995032375",
+    "tick": 3972,
+    "incarnation": "boot-1025027333629833",
     "event": "job_succeeded"
   }
 ]

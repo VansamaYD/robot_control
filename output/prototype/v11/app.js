@@ -29,6 +29,7 @@ try {
   showCode(selectedProgram.code);
   const model = bootstrap.model;
   const geometry = bootstrap.scene;
+  if (!geometry.rack) document.querySelector('.notice').textContent = '旧场景 · 鸡体部分浸入液面 · 液体为未标定近似';
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#101a26');
   const container = $('viewport');
@@ -44,6 +45,7 @@ try {
   controls.target.set(0, -.12, .13);
   if (parameters.get('view') === 'top') { camera.position.set(0, -.12, 1.25); camera.up.set(0, 1, 0); }
   if (parameters.get('view') === 'side') camera.position.set(-1.05, -.12, .30);
+  if (parameters.get('view') === 'rack') { camera.position.set(.42,-.48,.27); controls.target.set(0,.035,.11); }
   controls.enableDamping = true;
   scene.add(new THREE.HemisphereLight(0xd7e7ff, 0x45586b, 3.2));
   const key = new THREE.DirectionalLight(0xfff0db, 4);
@@ -67,15 +69,21 @@ try {
     const z = depth * i / 48;
     return new THREE.Vector2(Math.sqrt(Math.max(0, potRadius ** 2 - (potRadius - z) ** 2)), z);
   });
-  const pot = mesh(new THREE.LatheGeometry(potProfile, 96), material(0x657d8e, { transparent: true, opacity: .42, side: THREE.DoubleSide }));
+  const pot = mesh(new THREE.LatheGeometry(potProfile, 96), material(0x657d8e, { transparent: true, opacity: .32, depthWrite: false, side: THREE.DoubleSide }));
   pot.rotation.x = Math.PI / 2;
   const rim = mesh(new THREE.TorusGeometry(mouth, .004, 10, 100), steel); rim.position.z = depth;
   const juice = mesh(new THREE.CircleGeometry(1, 96), material(0x703a1e, { metalness: .1, roughness: .22 }));
   const chicken = mesh(new THREE.SphereGeometry(1, 48, 24), material(0xb87635, { roughness: .65 }));
   chicken.scale.fromArray(geometry.chicken.radii_m); chicken.position.fromArray(geometry.chicken.center_m);
-  for (const sign of [-1, 1]) {
-    const leg = mesh(new THREE.SphereGeometry(1, 24, 16), material(0xa96b31));
-    leg.scale.set(.035, .055, .035); leg.position.set(sign * .08, .085, .065);
+  for (const part of geometry.chicken.legs ?? []) {
+    const leg = mesh(new THREE.SphereGeometry(1,24,16),material(0xa96b31));
+    leg.scale.fromArray(part.radii_m); leg.position.fromArray(part.center_m);
+  }
+  for (const rod of geometry.rack?.rods ?? []) {
+    const a = new THREE.Vector3(...rod.a), b = new THREE.Vector3(...rod.b), delta = b.clone().sub(a);
+    const wire = mesh(new THREE.CylinderGeometry(rod.radius_m,rod.radius_m,delta.length(),8),steel);
+    wire.position.copy(a).add(b).multiplyScalar(.5);
+    wire.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.normalize());
   }
   const pedestal = mesh(new THREE.BoxGeometry(.16, .15, .08), material(0x243747)); pedestal.position.set(0, -.4, .04);
   const park = geometry.parking.position_m;
@@ -133,10 +141,15 @@ try {
   spoonRim.rotation.y = Math.PI / 2; spoonRim.position.fromArray(model.tool_offset_m);
   const liquidClip = new THREE.Plane();
   const ladleLiquid = mesh(new THREE.CircleGeometry(1, 48), material(0xa45c24, { side: THREE.DoubleSide, roughness: .25, clippingPlanes: [liquidClip] }));
-  const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(.0025, 8, 8), material(0xe3a854), 128);
+  const drops = new THREE.InstancedMesh(new THREE.SphereGeometry(.0025, 8, 8), material(0xffffff), 128);
   scene.add(drops); drops.count = 0;
   const dropMatrix = new THREE.Matrix4();
   const tcp = new THREE.Object3D(); tcp.position.fromArray(model.tool_offset_m); toolRoot.add(tcp);
+  const surfaceBeads = new THREE.InstancedMesh(new THREE.SphereGeometry(.0017,8,8),material(0xffcb75),128);
+  surfaceBeads.count = 0; scene.add(surfaceBeads);
+  const surfaceStreaks = new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xffcc7a,transparent:true,opacity:.85}));
+  surfaceStreaks.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(128*6),3));
+  surfaceStreaks.frustumCulled = false; scene.add(surfaceStreaks);
   const tcpMarker = mesh(new THREE.SphereGeometry(.004, 12, 8), material(0x85ffdc));
   const trace = mesh(new THREE.SphereGeometry(.002, 8, 8), material(0xffffff)); trace.visible = false;
   const trajectory = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0x6cf0cd, transparent: true, opacity: .65 }));
@@ -212,8 +225,17 @@ try {
     drops.count = Math.min(128, liquid.packets.length);
     liquid.packets.slice(0, 128).forEach((packet, index) => {
       dropMatrix.makeTranslation(...packet.position_m); drops.setMatrixAt(index, dropMatrix);
+      drops.setColorAt(index,new THREE.Color(packet.kind === 'return' ? 0xffdf9c : 0xe3a854));
     });
     drops.instanceMatrix.needsUpdate = true;
+    if (drops.instanceColor) drops.instanceColor.needsUpdate = true;
+    const films = (liquid.surface_packets ?? []).slice(0,128);
+    surfaceBeads.count = films.length;
+    films.forEach((film,i)=>{dropMatrix.makeTranslation(...film.position_m);surfaceBeads.setMatrixAt(i,dropMatrix);});
+    surfaceBeads.instanceMatrix.needsUpdate = true;
+    const streakPositions = surfaceStreaks.geometry.attributes.position;
+    films.forEach((film,i)=>{streakPositions.setXYZ(2*i,...film.previous_m);streakPositions.setXYZ(2*i+1,...film.position_m);});
+    streakPositions.needsUpdate = true; surfaceStreaks.geometry.setDrawRange(0,films.length*2);
     $('liquid-ledger').replaceChildren(...[
       ['锅内', liquid.pot_m3], ['勺内', liquid.ladle_m3], ['空中 / 表面', liquid.air_m3 + liquid.surface_m3],
       ['洒漏', liquid.spill_m3], ['收支偏差', liquid.balance_error_m3], ['自然交换', liquid.exchange_m3_s ?? 0, 'mL/s']
@@ -222,7 +244,7 @@ try {
       title.textContent = label; value.textContent = label === '自然交换' && state.paused ? '暂停' : (amount * 1e6).toFixed(3) + ' ' + unit; row.append(title, value); return row;
     }));
     const coverage = liquid.coverage;
-    $('coverage').textContent = coverage ? `本次仿真累计命中：左 ${(coverage.zone_hit_m3.left*1e6).toFixed(1)} · 中 ${(coverage.zone_hit_m3.center*1e6).toFixed(1)} · 右 ${(coverage.zone_hit_m3.right*1e6).toFixed(1)} mL（${coverage.covered_zones}/3 区）。这是落点统计，不能等同于整鸡湿润面积；翻鸡后可重复。` : '';
+    $('coverage').textContent = coverage ? `本次仿真累计命中：左 ${(coverage.zone_hit_m3.left*1e6).toFixed(1)} · 中 ${(coverage.zone_hit_m3.center*1e6).toFixed(1)} · 右 ${(coverage.zone_hit_m3.right*1e6).toFixed(1)} mL（${coverage.covered_zones}/3 区），已滴回锅内 ${((liquid.returned_m3 ?? 0)*1e6).toFixed(1)} mL。这是落点统计，不能等同于整鸡湿润面积；翻鸡后可重复。` : '';
     if (current && current.incarnation !== state.incarnation) {
       history.length = 0;
       $('snapshot-preview').hidden = true; $('snapshot-download').hidden = true;
@@ -379,7 +401,7 @@ try {
   window.addEventListener('blur', () => finishHold('blur', false));
   window.addEventListener('pagehide', () => finishHold('pagehide', false));
   document.addEventListener('visibilitychange', () => { if (document.hidden) finishHold('hidden', false); });
-  const statusName = value => ({offline_checked:'离线验证通过',succeeded:'上次运行完成',failed:'上次运行失败',unverified:'未运行草稿'}[value] ?? value);
+  const statusName = value => ({offline_checked:'离线验证通过',succeeded:'上次运行完成',failed:'上次运行失败',unverified:'未运行草稿',previous_scene:'旧场景记录·待复验'}[value] ?? value);
   function projectLabel(record) {
     return `${record.archived ? '已归档 · ' : ''}${record.kind === 'builtin' ? '内置 · ' : ''}${record.name} · v${record.version_number} · ${statusName(record.validation_status)}`;
   }
@@ -452,8 +474,10 @@ try {
     $('library-message').textContent = `已备份并归档 ${result.archived_projects} 个草稿；内置流程保留。`;
   });
   $('backup-library').onclick = act(async () => {
-    const record = await (await fetch('/api/library/export')).json();
-    const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([JSON.stringify(record,null,2)],{type:'application/json'}));
+    const response = await fetch('/api/library/export');
+    if (!response.ok) throw new Error('流程库备份失败');
+    // Preserve 0.0 versus 0 in immutable revision payloads.
+    const link = document.createElement('a'); link.href = URL.createObjectURL(await response.blob());
     link.download = 'robot-recipe-library-backup.json'; link.click();
     setTimeout(()=>URL.revokeObjectURL(link.href),1000);
   });
@@ -488,6 +512,13 @@ try {
     $('editor').hidden = true;
     return post('/api/run', { idempotency_key: crypto.randomUUID(), program_revision: selectedProgram.revision });
   });
+  let rackClose = parameters.get('view') === 'rack';
+  $('rack-view').onclick = () => {
+    rackClose = !rackClose;
+    if (rackClose) { camera.position.set(.42,-.48,.27); controls.target.set(0,.035,.11); }
+    else { camera.position.set(.70,-.98,.68); controls.target.set(0,-.12,.13); }
+    controls.update(); $('rack-view').textContent = rackClose ? '返回全景' : '近看回流';
+  };
   $('targets').onclick = () => {
     targets.visible = !targets.visible; $('targets').textContent = targets.visible ? '隐藏三点参考' : '显示三点参考';
   };

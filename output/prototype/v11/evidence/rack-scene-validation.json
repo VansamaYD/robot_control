@@ -1,0 +1,94 @@
+[
+  {
+    "name": "standard",
+    "configuration": "S_RACK-geometry-3",
+    "unchanged_actions_sha256": "117051055cc8f2cce38b92178c2ca1b4f1032c4615370bb83e9fc77e3b546398",
+    "samples": 2480,
+    "minimum_gap_m": 0.007518423004257162,
+    "wall_s": 3.3793493340490386,
+    "surface_seen": true,
+    "return_seen": true,
+    "liquid": {
+      "mode": "uncalibrated_volume_approximation",
+      "height_m": 0.07965013043391414,
+      "capacity_m3": 3.272492347489368e-05,
+      "pot_m3": 0.003981996750312048,
+      "ladle_m3": 3.272492347489368e-05,
+      "air_m3": 0,
+      "surface_m3": 0.0,
+      "spill_m3": 0.0,
+      "initial_m3": 0.0040147216737869305,
+      "balance_error_m3": 1.1275702593849246e-17,
+      "exchange_m3_s": 0.0,
+      "coverage": {
+        "zone_hit_m3": {
+          "left": 0.0,
+          "center": 3.2307478142440396e-05,
+          "right": 0.0
+        },
+        "covered_zones": 1,
+        "bounds_xy_m": [
+          [
+            0.010565469603725446,
+            -0.020000694887167474
+          ],
+          [
+            0.02499999999837443,
+            -0.020000000016847475
+          ]
+        ],
+        "model": "cumulative_impacts_not_wetted_area"
+      },
+      "returned_m3": 3.2307478142440396e-05,
+      "return_air_m3": 0,
+      "surface_packets": [],
+      "packets": []
+    }
+  },
+  {
+    "name": "three-zone",
+    "configuration": "S_RACK-geometry-3",
+    "unchanged_actions_sha256": "caf6fcc1d065710c150f71211b73b1c66e55f747d56b97a8f332ddd57fa82e72",
+    "samples": 8640,
+    "minimum_gap_m": 0.007518423004257107,
+    "wall_s": 12.455481834011152,
+    "surface_seen": true,
+    "return_seen": true,
+    "liquid": {
+      "mode": "uncalibrated_volume_approximation",
+      "height_m": 0.0796501304339137,
+      "capacity_m3": 3.272492347489368e-05,
+      "pot_m3": 0.003981996750312007,
+      "ladle_m3": 3.272492347489368e-05,
+      "air_m3": 0,
+      "surface_m3": 0.0,
+      "spill_m3": 0.0,
+      "initial_m3": 0.0040147216737869305,
+      "balance_error_m3": -3.0357660829594124e-17,
+      "exchange_m3_s": 0.0,
+      "coverage": {
+        "zone_hit_m3": {
+          "left": 3.23074790434408e-05,
+          "center": 3.2307479176378265e-05,
+          "right": 3.230747917756289e-05
+        },
+        "covered_zones": 3,
+        "bounds_xy_m": [
+          [
+            -0.056270087184880434,
+            -0.039804720589843676
+          ],
+          [
+            0.05627924003632059,
+            0.04000018578691029
+          ]
+        ],
+        "model": "cumulative_impacts_not_wetted_area"
+      },
+      "returned_m3": 9.692243739738199e-05,
+      "return_air_m3": 0,
+      "surface_packets": [],
+      "packets": []
+    }
+  }
+]

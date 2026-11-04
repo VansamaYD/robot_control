@@ -18,6 +18,8 @@ class Liquid:
         # Diagnostic cumulative impacts, never another volume-ledger reservoir.
         self.coverage = {'left': 0., 'center': 0., 'right': 0.}
         self.hit_bounds = None
+        self.films = []
+        self.returned = 0.
 
     @property
     def height(self):
@@ -81,16 +83,17 @@ class Liquid:
                 pass
             else:
                 self.ladle -= volume
-                self.packets.append({'p': outlet, 'velocity': np.array([0., 0., -.05]), 'v': volume})
+                self.packets.append({'p': outlet, 'velocity': np.array([0., 0., -.05]), 'v': volume, 'kind': 'pour'})
         remaining = []
         for packet in self.packets:
             start = packet['p']
             if self.geometry.submerged(start, self.height):
                 self.pot += packet['v']
+                if packet.get('kind') == 'return': self.returned += packet['v']
                 continue
             end = start + packet['velocity'] * dt + np.array([0., 0., -.5 * 9.81 * dt**2])
             packet['velocity'][2] -= 9.81 * dt
-            hit_chicken = self.geometry.segment_chicken(start, end)
+            hit_chicken = self.geometry.segment_chicken(start, end) if packet.get('kind') != 'return' else None
             hit_surface = None
             if start[2] >= self.height >= end[2] and end[2] < start[2]:
                 t = (start[2] - self.height) / (start[2] - end[2])
@@ -100,6 +103,7 @@ class Liquid:
             if hit_chicken is not None and (hit_surface is None or hit_chicken <= hit_surface):
                 self.surface += packet['v']
                 hit = start+(end-start)*hit_chicken
+                self.films.append({'hit':hit.copy(),'age':0.,'duration':.8,'v':packet['v']})
                 x = float(hit[0]-self.geometry.center[0])
                 zone = 'left' if x < -.025 else 'right' if x > .025 else 'center'
                 self.coverage[zone] += packet['v']
@@ -110,15 +114,24 @@ class Liquid:
                     self.hit_bounds = [np.minimum(self.hit_bounds[0], xy), np.maximum(self.hit_bounds[1], xy)]
             elif hit_surface is not None:
                 self.pot += packet['v']
+                if packet.get('kind') == 'return': self.returned += packet['v']
             elif end[2] < 0:
                 self.spill += packet['v']
             else:
                 packet['p'] = end
                 remaining.append(packet)
         self.packets = remaining
-        returned = self.surface * (1 - math.exp(-dt / 2))
-        self.surface -= returned
-        self.pot += returned
+        films = []
+        for film in self.films:
+            film['age'] += dt
+            if film['age']+1e-12 >= film['duration']:
+                self.surface -= film['v']
+                self.packets.append({'p':self.geometry.runoff_outlet(film['hit']),
+                    'velocity':np.array([0.,0.,-.02]),'v':film['v'],'kind':'return'})
+            else:
+                films.append(film)
+        self.films = films
+        if abs(self.surface) < 1e-15: self.surface = 0.
         excess = max(0., self.pot - self.geometry.volumes[-1])
         self.pot -= excess
         self.spill += excess
@@ -138,4 +151,9 @@ class Liquid:
                     'covered_zones': sum(v >= 1e-6 for v in self.coverage.values()),
                     'bounds_xy_m': [v.tolist() for v in self.hit_bounds] if self.hit_bounds is not None else None,
                     'model': 'cumulative_impacts_not_wetted_area'},
-                'packets': [{'position_m': p['p'].tolist(), 'volume_m3': p['v']} for p in self.packets]}
+                'returned_m3': self.returned,
+                'return_air_m3': sum(p['v'] for p in self.packets if p.get('kind') == 'return'),
+                'surface_packets': [{'position_m': self.geometry.surface_position(f['hit'],f['age']/f['duration']).tolist(),
+                    'previous_m':self.geometry.surface_position(f['hit'],max(0,f['age']/f['duration']-.12)).tolist(),
+                    'volume_m3':f['v']} for f in self.films],
+                'packets': [{'position_m': p['p'].tolist(), 'volume_m3': p['v'], 'kind':p.get('kind','pour')} for p in self.packets]}
